@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_12.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_13.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -219,7 +219,6 @@ function loginHTML(){
 function mainHTML(){
   const tabs=[["stamp","打刻"],["mypage","マイ"],["leave","休暇申請"],["welfare","福利厚生"],["expense","経費精算"],["overtime","時間外訪問"],["shift","シフト"]];
   if(user.role==="leader"||user.role==="admin"||user.role==="owner")tabs.push(["admin","管理"]);
-  if(user.role==="admin"||user.role==="owner")tabs.push(["timefix","TC修正"]);
   if(user.role==="admin"||user.role==="owner")tabs.push(["settings","設定"]);
   const isOwner=user.role==="owner";
   const isAdminPlus=user.role==="admin"||isOwner;
@@ -260,7 +259,6 @@ function pageHTML(){
   if(page==="expense")return expenseHTML();
   if(page==="overtime")return overtimeHTML();
   if(page==="shift")return shiftHTML();
-  if(page==="timefix")return timefixHTML();
   return"";
 }
 
@@ -383,7 +381,7 @@ function leaveHTML(){
   }).join("")}`;
 }
 
-let adminSubTab="pending"; // pending | history | csv
+let adminSubTab="pending"; // pending | history | csv | timefix
 
 function adminHTML(){
   const isOwner=user.role==="owner";
@@ -448,6 +446,7 @@ function adminHTML(){
         <button class="adminSubBtn" data-t="pending" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">承認待ち</button>
         <button class="adminSubBtn" data-t="history" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">履歴</button>
         <button class="adminSubBtn" data-t="csv" style="padding:10px 14px;border:none;border-bottom:2.5px solid ${A};background:transparent;cursor:pointer;font-size:13px;color:${A};font-weight:700;white-space:nowrap;">CSV出力</button>
+        ${isAdminPlus?`<button class="adminSubBtn" data-t="timefix" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">TC修正</button>`:""}
       </div>
       <div class="card">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px;">CSV出力</div>
@@ -491,6 +490,7 @@ function adminHTML(){
         <button class="adminSubBtn" data-t="pending" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">承認待ち</button>
         <button class="adminSubBtn" data-t="history" style="padding:10px 14px;border:none;border-bottom:2.5px solid ${A};background:transparent;cursor:pointer;font-size:13px;color:${A};font-weight:700;white-space:nowrap;">履歴</button>
         <button class="adminSubBtn" data-t="csv" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">CSV出力</button>
+        ${isAdminPlus?`<button class="adminSubBtn" data-t="timefix" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">TC修正</button>`:""}
       </div>
       <div class="card">
         <div style="font-size:13px;font-weight:700;margin-bottom:12px;">承認・却下履歴（全件）</div>
@@ -510,12 +510,26 @@ function adminHTML(){
     </div>`;
   }
 
+  // TC修正画面
+  if(adminSubTab==="timefix"){
+    return `<div>
+      <div style="display:flex;overflow-x:auto;border-bottom:1.5px solid ${BD};margin-bottom:14px;">
+        <button class="adminSubBtn" data-t="pending" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">承認待ち</button>
+        <button class="adminSubBtn" data-t="history" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">履歴</button>
+        <button class="adminSubBtn" data-t="csv" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">CSV出力</button>
+        <button class="adminSubBtn" data-t="timefix" style="padding:10px 14px;border:none;border-bottom:2.5px solid ${A};background:transparent;cursor:pointer;font-size:13px;color:${A};font-weight:700;white-space:nowrap;">TC修正</button>
+      </div>
+      ${timefixHTML()}
+    </div>`;
+  }
+
   return `<div>
     <!-- サブタブナビ -->
     <div style="display:flex;overflow-x:auto;border-bottom:1.5px solid ${BD};margin-bottom:14px;">
       <button class="adminSubBtn" data-t="pending" style="padding:10px 14px;border:none;border-bottom:2.5px solid ${A};background:transparent;cursor:pointer;font-size:13px;color:${A};font-weight:700;white-space:nowrap;">承認待ち</button>
       <button class="adminSubBtn" data-t="history" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">履歴</button>
       <button class="adminSubBtn" data-t="csv" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">CSV出力</button>
+      ${isAdminPlus?`<button class="adminSubBtn" data-t="timefix" style="padding:10px 14px;border:none;border-bottom:2.5px solid transparent;background:transparent;cursor:pointer;font-size:13px;color:${T2};white-space:nowrap;">TC修正</button>`:""}
     </div>
     <!-- 承認待ち -->
     <div class="card" style="margin-bottom:12px;">
@@ -2482,10 +2496,10 @@ function bindMain(){
   if(page==="welfare")bindWelfareEvents();
   if(page==="expense")bindExpenseEvents();
   if(page==="shift")bindShiftEvents();
-  if(page==="timefix")bindTimefixEvents();
   if(page==="overtime")bindOvertimeEvents();
   // 管理タブのサブタブ切り替え
   document.querySelectorAll(".adminSubBtn").forEach(b=>b.onclick=()=>{adminSubTab=b.dataset.t;render();});
+  if(adminSubTab==="timefix")bindTimefixEvents();
   // CSV出力
 
   // タイムカード集計CSV
