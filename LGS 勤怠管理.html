@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_10.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_11.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -59,14 +59,14 @@ function defaultDB(){return{
     {id:"lt4",name:"冬期休暇",days:5,cat:"winter",depts:[],mode:"all"},
     {id:"lt5",name:"特別休暇（有給前）",days:3,cat:"special_pre",depts:[],mode:"all"},
   ],
-  lreqs:[],lbal:{},retros:[],wreqs:[],expenses:[],overtimes:[],notifications:[],shifts:{},shiftsBase:{},jobTypes:["看護師","PT","介護福祉士","実務者(旧1級)","初任者(旧2級)","事務員"],positions:["管理者","所長","主任","副主任"]
+  lreqs:[],lbal:{},retros:[],wreqs:[],expenses:[],overtimes:[],notifications:[],shifts:{},shiftsBase:{},tcfixes:[],jobTypes:["看護師","PT","介護福祉士","実務者(旧1級)","初任者(旧2級)","事務員"],positions:["管理者","所長","主任","副主任"]
 };}
 
 function migrate(p){
   const d=defaultDB();
   if(!p.depts||!p.depts.length)p.depts=d.depts;
   if(!p.ltypes)p.ltypes=d.ltypes;
-  ["lreqs","lbal","retros","rules","assigns","records","staff","wreqs","expenses","overtimes","notifications","shifts","shiftsBase","jobTypes","positions"].forEach(k=>{if(!p[k])p[k]=d[k];});
+  ["lreqs","lbal","retros","rules","assigns","records","staff","wreqs","expenses","overtimes","notifications","shifts","shiftsBase","tcfixes","jobTypes","positions"].forEach(k=>{if(!p[k])p[k]=d[k];});
   p.staff.forEach(s=>{if(!s.role)s.role="staff";if(!s.pin)s.pin="0000";});
   p.ltypes.forEach(lt=>{if(!lt.depts)lt.depts=[];if(!lt.mode)lt.mode="all";if(lt.mode==="include"&&lt.depts.length===0)lt.mode="all";if(!lt.cat)lt.cat="normal";if(lt.days===undefined)lt.days=0;});
   p.depts.forEach(d=>{if(!d.logo)d.logo="";});
@@ -219,6 +219,7 @@ function loginHTML(){
 function mainHTML(){
   const tabs=[["stamp","打刻"],["mypage","マイ"],["leave","休暇申請"],["welfare","福利厚生"],["expense","経費精算"],["overtime","時間外訪問"],["shift","シフト"]];
   if(user.role==="leader"||user.role==="admin"||user.role==="owner")tabs.push(["admin","管理"]);
+  if(user.role==="admin"||user.role==="owner")tabs.push(["timefix","TC修正"]);
   if(user.role==="admin"||user.role==="owner")tabs.push(["settings","設定"]);
   const isOwner=user.role==="owner";
   const isAdminPlus=user.role==="admin"||isOwner;
@@ -259,6 +260,7 @@ function pageHTML(){
   if(page==="expense")return expenseHTML();
   if(page==="overtime")return overtimeHTML();
   if(page==="shift")return shiftHTML();
+  if(page==="timefix")return timefixHTML();
   return"";
 }
 
@@ -1896,6 +1898,161 @@ function bindShiftEvents(){
   };
 }
 
+
+// ===== タイムカード修正 =====
+let tfTab="fix"; // fix | history
+let tfMonth=new Date().toISOString().slice(0,7);
+let tfStaff="";
+
+function timefixHTML(){
+  const deptStaff=tfStaff?db.records.filter(r=>r.sid===tfStaff):[];
+  const monthRecs=db.records.filter(function(r){
+    var ci=r.ts.find(function(t){return t.type==="checkin";});
+    return tfStaff&&r.sid===tfStaff&&ci&&ci.time.slice(0,7)===tfMonth;
+  }).slice().sort(function(a,b){
+    var ca=a.ts.find(function(t){return t.type==="checkin";});
+    var cb=b.ts.find(function(t){return t.type==="checkin";});
+    return new Date(ca?.time||0)-new Date(cb?.time||0);
+  });
+
+  var html2='<div>';
+
+  // サブタブ
+  html2+='<div style="display:flex;border-bottom:1.5px solid '+BD+';margin-bottom:14px;">';
+  html2+='<button class="tfTabBtn" data-t="fix" style="flex:1;padding:11px;border:none;border-bottom:'+(tfTab==="fix"?"2.5px solid "+A:"2.5px solid transparent")+';background:transparent;cursor:pointer;font-size:13px;color:'+(tfTab==="fix"?A:T2)+';font-weight:'+(tfTab==="fix"?700:400)+';">修正</button>';
+  html2+='<button class="tfTabBtn" data-t="history" style="flex:1;padding:11px;border:none;border-bottom:'+(tfTab==="history"?"2.5px solid "+A:"2.5px solid transparent")+';background:transparent;cursor:pointer;font-size:13px;color:'+(tfTab==="history"?A:T2)+';font-weight:'+(tfTab==="history"?700:400)+';">修正履歴</button>';
+  html2+='</div>';
+
+  if(tfTab==="fix"){
+    // フィルター
+    html2+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">';
+    html2+='<input type="month" id="tfMonthInp" value="'+tfMonth+'" style="padding:7px 10px;border:1.5px solid '+BD+';border-radius:9px;font-size:13px;background:#fff;color:'+T+';">';
+    html2+='<select id="tfStaffInp" style="padding:7px 10px;border:1.5px solid '+BD+';border-radius:9px;font-size:13px;background:#fff;color:'+T+';flex:1;"><option value="">-- スタッフを選択 --</option>';
+    db.staff.forEach(function(s){html2+='<option value="'+s.id+'"'+(tfStaff===s.id?" selected":"")+'>'+s.name+'</option>';});
+    html2+='</select></div>';
+
+    if(!tfStaff){
+      html2+='<div style="text-align:center;color:'+T2+';font-size:13px;padding:30px 0;">スタッフを選択してください</div>';
+    }else if(monthRecs.length===0){
+      html2+='<div style="text-align:center;color:'+T2+';font-size:13px;padding:30px 0;">該当月の打刻記録がありません</div>';
+    }else{
+      html2+='<div style="font-size:11px;color:'+T2+';margin-bottom:10px;">日付をタップして修正できます</div>';
+      monthRecs.forEach(function(rec){
+        var ci=rec.ts.find(function(t){return t.type==="checkin";});
+        var co=rec.co;
+        var isFixed=rec.fixLog&&rec.fixLog.length>0;
+        var dateStr=ci?new Date(ci.time).toLocaleDateString("ja-JP",{month:"2-digit",day:"2-digit",weekday:"short"}):"--";
+        html2+='<div class="card tfRecCard" data-rid="'+rec.id+'" style="margin-bottom:8px;cursor:pointer;border:1.5px solid '+(isFixed?"#FCD34D":BD)+';">';
+        html2+='<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html2+='<div>';
+        html2+='<div style="font-size:13px;font-weight:600;">'+dateStr+'</div>';
+        html2+='<div style="font-size:12px;color:'+T2+';margin-top:2px;">出勤 '+fmt(ci?.time)+' ／ 退勤 '+fmt(co)+'</div>';
+        html2+='</div>';
+        html2+='<div style="display:flex;align-items:center;gap:8px;">';
+        if(isFixed)html2+='<span style="font-size:10px;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:20px;">修正済</span>';
+        html2+='<span style="color:'+T2+';font-size:18px;">›</span>';
+        html2+='</div></div></div>';
+      });
+    }
+  }
+
+  if(tfTab==="history"){
+    var fixes=(db.tcfixes||[]).slice().reverse();
+    if(fixes.length===0){
+      html2+='<div style="text-align:center;color:'+T2+';font-size:13px;padding:30px 0;">修正履歴がありません</div>';
+    }else{
+      fixes.forEach(function(fix){
+        var s=db.staff.find(function(x){return x.id===fix.sid;});
+        var fixer=db.staff.find(function(x){return x.id===fix.fixerId;});
+        html2+='<div class="card" style="margin-bottom:8px;">';
+        html2+='<div style="display:flex;justify-content:space-between;margin-bottom:6px;">';
+        html2+='<span style="font-size:13px;font-weight:600;">'+(s?.name||"不明")+'</span>';
+        html2+='<span style="font-size:11px;color:'+T2+';">'+fix.at.slice(0,10)+'</span>';
+        html2+='</div>';
+        html2+='<div style="font-size:12px;background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:6px;">';
+        html2+='<div style="color:'+R+';margin-bottom:3px;">修正前：出勤 '+fix.oldCi+' ／ 退勤 '+fix.oldCo+'</div>';
+        html2+='<div style="color:'+G+';">修正後：出勤 '+fix.newCi+' ／ 退勤 '+fix.newCo+'</div>';
+        html2+='</div>';
+        html2+='<div style="font-size:11px;color:'+T2+';">修正者：'+(fixer?.name||"不明")+(fix.reason?" ／ 理由："+fix.reason:"")+'</div>';
+        html2+='</div>';
+      });
+    }
+  }
+
+  html2+='</div>';
+  return html2;
+}
+
+function bindTimefixEvents(){
+  document.querySelectorAll(".tfTabBtn").forEach(function(b){b.onclick=function(){tfTab=b.dataset.t;render();};});
+
+  var mInp=document.getElementById("tfMonthInp");
+  if(mInp)mInp.onchange=function(e){tfMonth=e.target.value;render();};
+  var sInp=document.getElementById("tfStaffInp");
+  if(sInp)sInp.onchange=function(e){tfStaff=e.target.value;render();};
+
+  // 記録カードをクリックで修正モーダル
+  document.querySelectorAll(".tfRecCard").forEach(function(card){
+    card.onclick=function(){
+      var rid=card.dataset.rid;
+      var rec=db.records.find(function(r){return r.id===rid;});
+      if(!rec)return;
+      var ci=rec.ts.find(function(t){return t.type==="checkin";});
+      var ciTime=ci?new Date(ci.time).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}):"";
+      var coTime=rec.co?new Date(rec.co).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}):"";
+      var dateStr=ci?new Date(ci.time).toLocaleDateString("ja-JP",{month:"2-digit",day:"2-digit",weekday:"short"}):"";
+
+      var modal=document.createElement("div");
+      modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:flex-end;";
+      var mc='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;padding:20px;max-height:85vh;overflow-y:auto;">';
+      mc+='<div style="font-size:15px;font-weight:700;margin-bottom:4px;">タイムカード修正</div>';
+      mc+='<div style="font-size:12px;color:'+T2+';margin-bottom:16px;">'+dateStr+'</div>';
+      mc+='<div style="background:#FEF3C7;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:#92400E;">修正前：出勤 '+ciTime+' ／ 退勤 '+coTime+'</div>';
+      mc+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">出勤時刻</label>';
+      mc+='<input type="time" id="fixCiInp" value="'+ciTime+'" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:10px;">';
+      mc+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">退勤時刻</label>';
+      mc+='<input type="time" id="fixCoInp" value="'+coTime+'" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:10px;">';
+      mc+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">修正理由（任意）</label>';
+      mc+='<input type="text" id="fixReasonInp" placeholder="例：打刻ミスのため" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:13px;margin-bottom:14px;">';
+      mc+='<div style="display:flex;gap:10px;">';
+      mc+='<button id="btnFixCancel" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid '+BD+';background:#f9fafb;cursor:pointer;font-size:14px;">キャンセル</button>';
+      mc+='<button id="btnFixSave" style="flex:2;padding:12px;border-radius:10px;border:none;background:'+A+';color:#fff;cursor:pointer;font-size:14px;font-weight:700;">修正を保存</button>';
+      mc+='</div></div>';
+      modal.innerHTML=mc;
+      document.body.appendChild(modal);
+
+      document.getElementById("btnFixCancel").onclick=function(){modal.remove();};
+      document.getElementById("btnFixSave").onclick=function(){
+        var newCiStr=document.getElementById("fixCiInp").value;
+        var newCoStr=document.getElementById("fixCoInp").value;
+        var reason=document.getElementById("fixReasonInp").value||"";
+        if(!newCiStr||!newCoStr){toast("時刻を入力してください");return;}
+
+        var dateBase=ci?ci.time.slice(0,10):new Date().toISOString().slice(0,10);
+        var newCiISO=dateBase+"T"+newCiStr+":00";
+        var newCoISO=dateBase+"T"+newCoStr+":00";
+
+        // 修正ログを保存
+        if(!db.tcfixes)db.tcfixes=[];
+        db.tcfixes.push({
+          id:uid(),sid:rec.sid,rid:rec.id,
+          oldCi:ciTime,oldCo:coTime,
+          newCi:newCiStr,newCo:newCoStr,
+          fixerId:user.id,reason,at:now()
+        });
+
+        // レコードを更新
+        if(ci)ci.time=newCiISO;
+        rec.co=newCoISO;
+        if(!rec.fixLog)rec.fixLog=[];
+        rec.fixLog.push({by:user.id,at:now(),oldCi:ciTime,oldCo:coTime,newCi:newCiStr,newCo:newCoStr});
+
+        save();saveToCloud();modal.remove();render();toast("タイムカードを修正しました");
+      };
+    };
+  });
+}
+
 function balHTML(){
   const gasUrl="https://script.google.com/macros/s/AKfycbzKbUDjhhLI3SuRDbmQcEtfRhqBN5JHCywh0oDZ4nEKXiERv6vWUqGhD9mHomYMT7aB/exec";
   return `<div class="card" style="margin-bottom:12px;border:1.5px solid #bee3f8;background:#ebf8ff;">
@@ -2325,6 +2482,7 @@ function bindMain(){
   if(page==="welfare")bindWelfareEvents();
   if(page==="expense")bindExpenseEvents();
   if(page==="shift")bindShiftEvents();
+  if(page==="timefix")bindTimefixEvents();
   if(page==="overtime")bindOvertimeEvents();
   // 管理タブのサブタブ切り替え
   document.querySelectorAll(".adminSubBtn").forEach(b=>b.onclick=()=>{adminSubTab=b.dataset.t;render();});
