@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_16.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_19.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2629,7 +2629,7 @@ function bindMain(){
     const doWelfare=document.getElementById("csv_welfare")?.checked;
     const doExpense=document.getElementById("csv_expense")?.checked;
     const doOT=document.getElementById("csv_overtime")?.checked;
-    if(!doStamp&&!doLeave&&!doWelfare&&!doExpense&&!doOT){toast("出力する種別を選択してください");return;}
+    if(!doStamp&&!doLeave&&!doWelfare&&!doExpense&&!doOT&&!doSummary){toast("出力する種別を選択してください");return;}
     const typeLabel={training:"外部研修補助",book:"書籍購入",community:"地域活動",study:"内部勉強会"};
     let csvSections=[];
 
@@ -2644,17 +2644,55 @@ function bindMain(){
       const getDow=(d)=>new Date(parseInt(month.split("-")[0]),parseInt(month.split("-")[1])-1,d).getDay();
       const isWeekend=(d)=>{const dow=getDow(d);return dow===0||dow===6;};
 
-      const headers=["氏名","所属","出勤日数","有給日数","有給時間(h)","休日日数","休日出勤日数","休日出勤時間(h)","OC回数","休日OC回数","研修回数","地域活動回数","時間外訪問件数","コメント"];
+      const headers=["氏名","所属","出勤日数","有給日数","有給時間(h)","実働時間(h)","残業時間(h)","休日日数","休日出勤日数","休日出勤時間(h)","OC回数","休日OC回数","研修回数","地域活動回数","時間外訪問件数","経費精算合計(円)","福利厚生合計(円)","コメント"];
+      const hm=(m)=>Math.floor(m/60)+":"+String(m%60).padStart(2,"0");
       const sumRows=db.staff.map(s=>{
+        const asgn=db.assigns[s.id]||{};
+        const rule=db.rules.find(r=>r.id===asgn.rid);
+        let stdHours=8;
+        if(rule&&rule.start&&rule.end){
+          const sp=rule.start.split(":").map(Number);
+          const ep=rule.end.split(":").map(Number);
+          let diffMin=(ep[0]*60+ep[1])-(sp[0]*60+sp[1]);
+          if(rule.autoMin)diffMin-=rule.autoMin;
+          stdHours=Math.round(diffMin/60*10)/10;
+        }
         // 出勤記録
         const recs=db.records.filter(r=>{
           const ci=r.ts.find(t=>t.type==="checkin");
           return r.sid===s.id&&ci&&ci.time.slice(0,7)===month&&r.done;
         });
-        // 出勤日数
         const workDates=new Set(recs.map(r=>{const ci=r.ts.find(t=>t.type==="checkin");return ci?.time.slice(0,10);}));
         const workDays=workDates.size;
-        // 有給日数・時間
+        // 実働・残業時間
+        let totalWorkMin=0,totalOtMin=0;
+        recs.forEach(rec=>{
+          const ci=rec.ts.find(t=>t.type==="checkin");
+          const co=rec.co;
+          if(!ci||!co)return;
+          let ciTime=new Date(ci.time);
+          const coTime=new Date(co);
+          if(rule&&rule.start){
+            const sp=rule.start.split(":").map(Number);
+            const stdStart=new Date(ci.time.slice(0,10)+"T"+String(sp[0]).padStart(2,"0")+":"+String(sp[1]).padStart(2,"0")+":00");
+            if(ciTime<stdStart)ciTime=stdStart;
+          }
+          let breakMin=0;
+          if(asgn.autoBreak&&rule?.autoMin)breakMin=rule.autoMin;
+          const workMin=Math.round((coTime-ciTime)/60000)-breakMin;
+          totalWorkMin+=Math.max(0,workMin);
+          if(rule&&rule.end){
+            const ep=rule.end.split(":").map(Number);
+            const stdEnd=new Date(co.slice(0,10)+"T"+String(ep[0]).padStart(2,"0")+":"+String(ep[1]).padStart(2,"0")+":00");
+            if(coTime>stdEnd){
+              const otMin=Math.floor(Math.round((coTime-stdEnd)/60000)/15)*15;
+              totalOtMin+=otMin;
+            }
+          }
+        });
+        const workHours=Math.round(totalWorkMin/60*10)/10;
+        const otHours=Math.round(totalOtMin/60*10)/10;
+        // 有給
         const approvedLeave=db.lreqs.filter(r=>r.sid===s.id&&r.status==="approved"&&r.ds.slice(0,7)===month);
         const paidLeave=approvedLeave.filter(r=>{const lt=db.ltypes.find(t=>t.id===r.lid);return lt?.name==="有給休暇"||lt?.name==="有給";});
         const paidDays=paidLeave.reduce((sum,r)=>sum+(r.unit==="hour"?0:r.days),0);
@@ -2664,21 +2702,15 @@ function bindMain(){
           if(r.unit==="pm")return sum+5;
           return sum;
         },0);
-        // シフトから各種集計
+        // シフト集計
         let offDays=0,holidayWorkDays=0,holidayWorkHours=0,ocCount=0,holidayOcCount=0,trainCount=0;
         for(let d=1;d<=days;d++){
           const shiftVal=getShift(s.id,month,d);
           const dateStr=month+"-"+String(d).padStart(2,"0");
-          const isOff=leaveShiftVals.includes(shiftVal)||(!shiftVal&&isWeekend(d));
-          // 休日日数（シフト上の休暇系）
           if(leaveShiftVals.includes(shiftVal))offDays++;
-          // OC回数
-          if(ocAllVals.includes(shiftVal)){ocCount++;}
-          // 休日OC
+          if(ocAllVals.includes(shiftVal))ocCount++;
           if(ocAllVals.includes(shiftVal)&&isWeekend(d))holidayOcCount++;
-          // 研修
           if(shiftVal==="研")trainCount++;
-          // 休日出勤（シフトが休暇系なのに打刻あり）
           if(leaveShiftVals.includes(shiftVal)){
             const dayRecs=recs.filter(r=>{const ci=r.ts.find(t=>t.type==="checkin");return ci&&ci.time.slice(0,10)===dateStr;});
             if(dayRecs.length>0){
@@ -2686,10 +2718,7 @@ function bindMain(){
               dayRecs.forEach(rec=>{
                 const ci=rec.ts.find(t=>t.type==="checkin");
                 const co=rec.co;
-                if(ci&&co){
-                  const mins=Math.round((new Date(co)-new Date(ci.time))/60000);
-                  holidayWorkHours+=Math.round(mins/60*10)/10;
-                }
+                if(ci&&co){const mins=Math.round((new Date(co)-new Date(ci.time))/60000);holidayWorkHours+=Math.round(mins/60*10)/10;}
               });
             }
           }
@@ -2697,13 +2726,20 @@ function bindMain(){
         // 地域活動
         const communityCount=(db.wreqs||[]).filter(r=>r.sid===s.id&&r.wtype==="community"&&r.at.slice(0,7)===month&&r.status==="approved").length;
         // 時間外訪問
-        const otCount=(db.overtimes||[]).filter(o=>o.sid===s.id&&o.month===month).reduce((sum,o)=>{
-          return sum+(o.items?.filter(i=>i.status==="approved").length||0);
+        const otCount=(db.overtimes||[]).filter(o=>o.sid===s.id&&o.month===month).reduce((sum,o)=>sum+(o.items?.filter(i=>i.status==="approved").length||0),0);
+        // 経費精算合計
+        const expTotal=(db.expenses||[]).filter(e=>e.sid===s.id&&e.date.slice(0,7)===month&&e.status==="approved").reduce((sum,e)=>sum+parseInt(e.amount||0),0);
+        // 福利厚生合計（地域活動1500・研修・書籍など承認済み）
+        const wfTotal=(db.wreqs||[]).filter(r=>r.sid===s.id&&r.at.slice(0,7)===month&&r.status==="approved").reduce((sum,r)=>{
+          if(r.wtype==="community")return sum+1500;
+          if(r.wtype==="study"){const role=r.data?.role||"";if(role.includes("時間外"))return sum+3000;if(role.includes("主催"))return sum+2000;return sum+1500;}
+          if(r.wtype==="training"||r.wtype==="book")return sum+parseInt(r.data?.amount||0);
+          return sum;
         },0);
         // コメント
         const comments=recs.map(r=>r.comment).filter(Boolean).join("／");
         const dept=db.depts.find(d=>d.id===s.deptId);
-        return [s.name,dept?.name||"",workDays,paidDays,paidHours,offDays,holidayWorkDays,Math.round(holidayWorkHours*10)/10,ocCount,holidayOcCount,trainCount,communityCount,otCount,comments].map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(",");
+        return [s.name,dept?.name||"",workDays,paidDays,paidHours,workHours,otHours,offDays,holidayWorkDays,Math.round(holidayWorkHours*10)/10,ocCount,holidayOcCount,trainCount,communityCount,otCount,expTotal,wfTotal,comments].map(v=>`"${String(v||0).replace(/"/g,'""')}"`).join(",");
       });
       csvSections.push("【月次サマリー】\n"+[headers.join(","),...sumRows].join("\n"));
     }
