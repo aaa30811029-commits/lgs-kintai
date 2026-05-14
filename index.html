@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_15.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_16.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -457,6 +457,7 @@ function adminHTML(){
           ${[
             {id:"csv_stamp",label:"📋 出退勤記録"},
             {id:"csv_timecard",label:"⏰ タイムカード集計"},
+            {id:"csv_summary",label:"📊 月次サマリー（社労士用）"},
             {id:"csv_leave",label:"🌴 休暇申請"},
             {id:"csv_welfare",label:"🎁 福利厚生申請"},
             {id:"csv_expense",label:"💴 経費精算"},
@@ -2026,6 +2027,8 @@ function bindTimefixEvents(){
       mc+='<input type="time" id="fixCiInp" value="'+ciTime+'" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:10px;">';
       mc+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">退勤時刻</label>';
       mc+='<input type="time" id="fixCoInp" value="'+coTime+'" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:10px;">';
+      mc+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">出勤コメント</label>';
+      mc+='<input type="text" id="fixCommentInp" value="'+(rec.comment||"")+'" placeholder="例：在宅、直行など" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:13px;margin-bottom:10px;">';
       mc+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">修正理由（任意）</label>';
       mc+='<input type="text" id="fixReasonInp" placeholder="例：打刻ミスのため" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:13px;margin-bottom:14px;">';
       mc+='<div style="display:flex;gap:10px;">';
@@ -2045,6 +2048,7 @@ function bindTimefixEvents(){
         var dateBase=ci?ci.time.slice(0,10):new Date().toISOString().slice(0,10);
         var newCiISO=dateBase+"T"+newCiStr+":00";
         var newCoISO=dateBase+"T"+newCoStr+":00";
+        var newComment=document.getElementById("fixCommentInp")?.value||rec.comment||"";
 
         // 修正ログを保存
         if(!db.tcfixes)db.tcfixes=[];
@@ -2058,6 +2062,7 @@ function bindTimefixEvents(){
         // レコードを更新
         if(ci)ci.time=newCiISO;
         rec.co=newCoISO;
+        rec.comment=newComment;
         if(!rec.fixLog)rec.fixLog=[];
         rec.fixLog.push({by:user.id,at:now(),oldCi:ciTime,oldCo:coTime,newCi:newCiStr,newCo:newCoStr});
 
@@ -2250,9 +2255,33 @@ function bindMain(){
   document.querySelectorAll(".sBtn").forEach(b=>b.onclick=()=>{
     const sid=window._ss;if(!sid){toast("スタッフを選択してください");return;}
     const type=b.dataset.t;const n=now();
-    if(type==="checkin"){db.records.push({id:uid(),sid,rid:null,ts:[{type:"checkin",time:n}],done:false,co:null,brk:0,created:n});}
-    else{const rec=getLast(sid);if(!rec){toast("出勤打刻がありません");return;}rec.ts.push({type,time:n});if(type==="checkout"){rec.done=true;rec.co=n;}}
-    save();saveToCloud();render();toast(`${{checkin:"出勤",checkout:"退勤",rest_start:"休憩開始",rest_end:"休憩終了"}[type]}を記録しました (${fmt(n)})`);
+    if(type==="checkin"){
+      // 出勤時はコメント入力モーダルを表示
+      const modal=document.createElement("div");
+      modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:flex-end;";
+      modal.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;padding:20px;">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px;">出勤打刻</div>
+        <div style="font-size:12px;color:${T2};margin-bottom:14px;">${fmt(n)}</div>
+        <label class="lbl">コメント（任意）</label>
+        <input type="text" id="ciCommentInp" class="inp" placeholder="例：在宅、直行など">
+        <div style="display:flex;gap:10px;">
+          <button id="btnCiCancel" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid ${BD};background:#f9fafb;cursor:pointer;font-size:14px;">キャンセル</button>
+          <button id="btnCiOk" style="flex:2;padding:12px;border-radius:10px;border:none;background:${G};color:#fff;cursor:pointer;font-size:14px;font-weight:700;">出勤する</button>
+        </div>
+      </div>`;
+      document.body.appendChild(modal);
+      document.getElementById("btnCiCancel").onclick=()=>modal.remove();
+      document.getElementById("btnCiOk").onclick=()=>{
+        const comment=document.getElementById("ciCommentInp").value||"";
+        db.records.push({id:uid(),sid,rid:null,ts:[{type:"checkin",time:n}],done:false,co:null,brk:0,created:n,comment});
+        save();saveToCloud();modal.remove();render();toast(`出勤を記録しました (${fmt(n)})`);
+      };
+      setTimeout(()=>document.getElementById("ciCommentInp")?.focus(),100);
+    }else{
+      const rec=getLast(sid);if(!rec){toast("出勤打刻がありません");return;}
+      rec.ts.push({type,time:n});if(type==="checkout"){rec.done=true;rec.co=n;}
+      save();saveToCloud();render();toast(`${{checkout:"退勤",rest_start:"休憩開始",rest_end:"休憩終了"}[type]}を記録しました (${fmt(n)})`);
+    }
   });
   const bR=document.getElementById("btnRetro");
   if(bR)bR.onclick=()=>{
@@ -2605,6 +2634,79 @@ function bindMain(){
     let csvSections=[];
 
     const doTimecard=document.getElementById("csv_timecard")?.checked;
+    const doSummary=document.getElementById("csv_summary")?.checked;
+    if(doSummary){
+      // 月次サマリー生成
+      const leaveShiftVals=["V","有","am有","pm有","時有","リ休","時リ","特","時特","夏","冬","冬/O","忌","育","欠","病","O2","VO","VO2"];
+      const ocShiftVals=["O","VO","冬/O"];
+      const ocAllVals=["O","O2","VO","VO2","冬/O"];
+      const days=new Date(parseInt(month.split("-")[0]),parseInt(month.split("-")[1]),0).getDate();
+      const getDow=(d)=>new Date(parseInt(month.split("-")[0]),parseInt(month.split("-")[1])-1,d).getDay();
+      const isWeekend=(d)=>{const dow=getDow(d);return dow===0||dow===6;};
+
+      const headers=["氏名","所属","出勤日数","有給日数","有給時間(h)","休日日数","休日出勤日数","休日出勤時間(h)","OC回数","休日OC回数","研修回数","地域活動回数","時間外訪問件数","コメント"];
+      const sumRows=db.staff.map(s=>{
+        // 出勤記録
+        const recs=db.records.filter(r=>{
+          const ci=r.ts.find(t=>t.type==="checkin");
+          return r.sid===s.id&&ci&&ci.time.slice(0,7)===month&&r.done;
+        });
+        // 出勤日数
+        const workDates=new Set(recs.map(r=>{const ci=r.ts.find(t=>t.type==="checkin");return ci?.time.slice(0,10);}));
+        const workDays=workDates.size;
+        // 有給日数・時間
+        const approvedLeave=db.lreqs.filter(r=>r.sid===s.id&&r.status==="approved"&&r.ds.slice(0,7)===month);
+        const paidLeave=approvedLeave.filter(r=>{const lt=db.ltypes.find(t=>t.id===r.lid);return lt?.name==="有給休暇"||lt?.name==="有給";});
+        const paidDays=paidLeave.reduce((sum,r)=>sum+(r.unit==="hour"?0:r.days),0);
+        const paidHours=paidLeave.reduce((sum,r)=>{
+          if(r.unit==="hour")return sum+(r.hours||0);
+          if(r.unit==="am")return sum+4;
+          if(r.unit==="pm")return sum+5;
+          return sum;
+        },0);
+        // シフトから各種集計
+        let offDays=0,holidayWorkDays=0,holidayWorkHours=0,ocCount=0,holidayOcCount=0,trainCount=0;
+        for(let d=1;d<=days;d++){
+          const shiftVal=getShift(s.id,month,d);
+          const dateStr=month+"-"+String(d).padStart(2,"0");
+          const isOff=leaveShiftVals.includes(shiftVal)||(!shiftVal&&isWeekend(d));
+          // 休日日数（シフト上の休暇系）
+          if(leaveShiftVals.includes(shiftVal))offDays++;
+          // OC回数
+          if(ocAllVals.includes(shiftVal)){ocCount++;}
+          // 休日OC
+          if(ocAllVals.includes(shiftVal)&&isWeekend(d))holidayOcCount++;
+          // 研修
+          if(shiftVal==="研")trainCount++;
+          // 休日出勤（シフトが休暇系なのに打刻あり）
+          if(leaveShiftVals.includes(shiftVal)){
+            const dayRecs=recs.filter(r=>{const ci=r.ts.find(t=>t.type==="checkin");return ci&&ci.time.slice(0,10)===dateStr;});
+            if(dayRecs.length>0){
+              holidayWorkDays++;
+              dayRecs.forEach(rec=>{
+                const ci=rec.ts.find(t=>t.type==="checkin");
+                const co=rec.co;
+                if(ci&&co){
+                  const mins=Math.round((new Date(co)-new Date(ci.time))/60000);
+                  holidayWorkHours+=Math.round(mins/60*10)/10;
+                }
+              });
+            }
+          }
+        }
+        // 地域活動
+        const communityCount=(db.wreqs||[]).filter(r=>r.sid===s.id&&r.wtype==="community"&&r.at.slice(0,7)===month&&r.status==="approved").length;
+        // 時間外訪問
+        const otCount=(db.overtimes||[]).filter(o=>o.sid===s.id&&o.month===month).reduce((sum,o)=>{
+          return sum+(o.items?.filter(i=>i.status==="approved").length||0);
+        },0);
+        // コメント
+        const comments=recs.map(r=>r.comment).filter(Boolean).join("／");
+        const dept=db.depts.find(d=>d.id===s.deptId);
+        return [s.name,dept?.name||"",workDays,paidDays,paidHours,offDays,holidayWorkDays,Math.round(holidayWorkHours*10)/10,ocCount,holidayOcCount,trainCount,communityCount,otCount,comments].map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(",");
+      });
+      csvSections.push("【月次サマリー】\n"+[headers.join(","),...sumRows].join("\n"));
+    }
     if(doTimecard){
       const tcRows=calcTimecard(month);
       if(tcRows.length>0){
@@ -2664,9 +2766,9 @@ function bindMain(){
   };
   // 全選択・全解除
   const csvSel=document.getElementById("csvSelectAll");
-  if(csvSel)csvSel.onclick=()=>["csv_stamp","csv_timecard","csv_leave","csv_welfare","csv_expense","csv_overtime"].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=true;});
+  if(csvSel)csvSel.onclick=()=>["csv_stamp","csv_timecard","csv_summary","csv_leave","csv_welfare","csv_expense","csv_overtime"].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=true;});
   const csvClr=document.getElementById("csvClearAll");
-  if(csvClr)csvClr.onclick=()=>["csv_stamp","csv_timecard","csv_leave","csv_welfare","csv_expense","csv_overtime"].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+  if(csvClr)csvClr.onclick=()=>["csv_stamp","csv_timecard","csv_summary","csv_leave","csv_welfare","csv_expense","csv_overtime"].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
 }
 
 
