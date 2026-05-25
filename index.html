@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_84.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_86.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -392,10 +392,14 @@ function stampHTML(){
       <button class="sBtn" data-t="checkin" style="flex:1;padding:18px 6px;border-radius:12px;border:2px solid ${isOff?G:BD};background:${isOff?"#f0fff4":"transparent"};color:${isOff?G:T3};cursor:${isOff?"pointer":"not-allowed"};font-size:14px;font-weight:700;opacity:${isOff?1:0.3};transition:all 0.15s;">出勤</button>
       <button class="sBtn" data-t="checkout" style="flex:1;padding:18px 6px;border-radius:12px;border:2px solid ${isWork?R:BD};background:${isWork?"#fff5f5":"transparent"};color:${isWork?R:T3};cursor:${isWork?"pointer":"not-allowed"};font-size:14px;font-weight:700;opacity:${isWork?1:0.3};transition:all 0.15s;">退勤</button>
     </div>
-    <div style="display:flex;gap:10px;margin-bottom:14px;">
+    ${(()=>{
+      const asgnR=db.assigns[sid]||{};
+      if(asgnR.autoBreak&&asgnR.autoMin>0)return "";
+      return `<div style="display:flex;gap:10px;margin-bottom:14px;">
       <button class="sBtn" data-t="rest_start" style="flex:1;padding:18px 6px;border-radius:12px;border:2px solid ${isWork?O:BD};background:${isWork?"#fffaf0":"transparent"};color:${isWork?O:T3};cursor:${isWork?"pointer":"not-allowed"};font-size:14px;font-weight:700;opacity:${isWork?1:0.3};transition:all 0.15s;">休憩開始</button>
       <button class="sBtn" data-t="rest_end" style="flex:1;padding:18px 6px;border-radius:12px;border:2px solid ${isRest?O:BD};background:${isRest?"#fffaf0":"transparent"};color:${isRest?O:T3};cursor:${isRest?"pointer":"not-allowed"};font-size:14px;font-weight:700;opacity:${isRest?1:0.3};transition:all 0.15s;">休憩終了</button>
-    </div>`:""}
+    </div>`;
+    })()}`:""}
     ${(()=>{
       const asgn=db.assigns[sid]||{};
       if(asgn.autoBreak&&asgn.autoMin>0){
@@ -3393,6 +3397,10 @@ function bindMain(){
       if(!/^\d{4}$/.test(pin)){toast("PINは4桁の数字にしてください");return;}
       const position=document.getElementById("esPosition")?.value||"";
       const jobTypes=Array.from(document.querySelectorAll(".esJobCheck:checked")).map(function(c){return c.value;});
+      const autoMin=parseInt(document.getElementById("esAutoMin")?.value||0);
+      if(!db.assigns[s.id])db.assigns[s.id]={};
+      db.assigns[s.id].autoMin=autoMin;
+      db.assigns[s.id].autoBreak=autoMin>0;
       db.staff=db.staff.map(x=>x.id===s.id?{...x,name,type,deptId,join,role,pin,position,jobTypes}:x);
       save();saveToCloud();modal.remove();render();toast(`${name}の情報を更新しました`);
     };
