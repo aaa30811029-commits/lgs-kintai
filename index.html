@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_86.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_87.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3060,6 +3060,18 @@ function bindMain(){
   document.getElementById("btnLogout").onclick=()=>{user=null;loginStaffId="";pinBuf="";window._ss="";page="login";render();};
   document.querySelectorAll(".navBtn").forEach(b=>b.onclick=()=>{page=b.dataset.p;render();});
   document.querySelectorAll(".stBtn").forEach(b=>b.onclick=()=>{stab=b.dataset.t;render();});
+  // 部署カラー変更
+  document.querySelectorAll(".deptColor").forEach(function(inp){
+    inp.oninput=function(){
+      var dept=db.depts.find(function(d){return d.id===inp.dataset.id;});
+      if(dept){
+        dept.color=inp.value;
+        save();saveToCloud();
+        var preview=inp.previousElementSibling;
+        if(preview)preview.style.background=inp.value;
+      }
+    };
+  });
   var btnOpenWizard=document.getElementById("btnOpenWizard");
   if(btnOpenWizard)btnOpenWizard.onclick=()=>openStaffWizard();
   // 職種追加
