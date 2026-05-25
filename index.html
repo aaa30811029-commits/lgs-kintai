@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_90.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_91.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3351,6 +3351,8 @@ function bindMain(){
       <div style="font-size:15px;font-weight:700;margin-bottom:16px;">${s.name} の情報を編集</div>
       <label class="lbl">氏名</label>
       <input type="text" id="esSname" class="inp" value="${s.name}">
+      <label class="lbl">ふりがな</label>
+      <input type="text" id="esFurigana" class="inp" placeholder="例：やまだ はなこ" value="${s.furigana||""}">
       <label class="lbl">雇用区分</label>
       <select id="esType" class="inp">
         <option value="fulltime" ${s.type==="fulltime"?"selected":""}>常勤</option>
