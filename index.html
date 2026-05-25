@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_91.html -->
+<!-- saved from url=(0046)file:///C:/Users/ne-65/Downloads/index_96.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -99,8 +99,8 @@ function defaultDB(){return{
   ],
   rules:[],breakRules:[],assigns:{},records:[],
   ltypes:[
-    {id:"lt1",name:"有給休暇",days:10,cat:"paid",depts:[],mode:"all"},
-    {id:"lt2",name:"リフレッシュ休暇",days:6,cat:"refresh",depts:["d1","d3"],mode:"include"},
+    {id:"lt1",name:"有給休暇",days:10,cat:"paid",depts:[],mode:"all",hLimit:40},
+    {id:"lt2",name:"リフレッシュ休暇",days:6,cat:"refresh",depts:["d1","d3"],mode:"include",hLimit:null},
     {id:"lt3",name:"夏季休暇",days:3,cat:"summer",depts:[],mode:"all"},
     {id:"lt4",name:"冬期休暇",days:5,cat:"winter",depts:[],mode:"all"},
     {id:"lt5",name:"特別休暇（有給前）",days:3,cat:"special_pre",depts:[],mode:"all"},
@@ -114,7 +114,7 @@ function migrate(p){
   if(!p.ltypes)p.ltypes=d.ltypes;
   ["lreqs","lbal","paidLedger","retros","rules","breakRules","assigns","records","staff","wreqs","expenses","overtimes","notifications","shifts","shiftsBase","tcfixes","tcreqs","jobTypes","positions"].forEach(k=>{if(!p[k])p[k]=d[k];});
   p.staff.forEach(s=>{if(!s.role)s.role="staff";if(!s.pin)s.pin="0000";});
-  p.ltypes.forEach(lt=>{if(!lt.depts)lt.depts=[];if(!lt.mode)lt.mode="all";if(lt.mode==="include"&&lt.depts.length===0)lt.mode="all";if(!lt.cat)lt.cat="normal";if(lt.days===undefined)lt.days=0;});
+  p.ltypes.forEach(lt=>{if(!lt.depts)lt.depts=[];if(!lt.mode)lt.mode="all";if(lt.mode==="include"&&lt.depts.length===0)lt.mode="all";if(!lt.cat)lt.cat="normal";if(lt.days===undefined)lt.days=0;if(lt.hLimit===undefined){if(lt.cat==="paid")lt.hLimit=40;else lt.hLimit=null;}});
   p.depts.forEach(d=>{if(!d.logo)d.logo="";});
   return p;
 }
@@ -167,6 +167,22 @@ function getSt(sid){
 }
 
 // 休暇種別の説明文
+// スタッフの有給時間上限を計算
+function getHLimit(lt, s){
+  if(!lt.hLimit && lt.cat!=="special_pre" && lt.cat!=="refresh")return null;
+  if(lt.cat==="paid"){
+    // 有給：契約時間×5日
+    const ch=s?s.contractHours||8:8;
+    return Math.round(ch*5);
+  }
+  if(lt.cat==="special_pre"||lt.cat==="refresh"){
+    // 特別・リフレッシュ：付与日数×8時間
+    const bal=db.lbal[s?s.id+"_"+lt.id:""]??lt.days;
+    return Math.round(bal*8);
+  }
+  return lt.hLimit||null;
+}
+
 function getLeaveDesc(name){
   const descs={
     "有給休暇":"・入職6ヶ月後に発生\n・年1回更新\n・時間単位OK（年間40時間まで）",
@@ -432,12 +448,18 @@ function mypageHTML(){
           <div style="font-size:28px;font-weight:700;color:${c};margin-bottom:2px;">${rem}日</div>
           <div style="font-size:11px;color:${T3};">付与${tot} / 消化${used}</div>
           ${getLeaveDesc(lt.name)?`<div style="font-size:10px;color:${T2};margin-top:4px;line-height:1.6;white-space:pre-line;">${getLeaveDesc(lt.name)}</div>`:""}
-          ${(lt.name==="有給休暇"||lt.name==="有給")?(()=>{
-            const usedH=db.lreqs.filter(r=>r.sid===user.id&&r.status==="approved"&&(r.unit==="hour"||r.unit==="am"||r.unit==="pm")).reduce((s,r)=>s+(r.unit==="hour"?(r.hours||0):r.unit==="am"?4:5),0);
-            const remH=Math.max(0,40-usedH);
+          ${(()=>{
+            const hs=db.staff.find(x=>x.id===user.id);
+            const hLim=getHLimit(lt,hs);
+            if(!hLim)return "";
+            const hBal=db.lbal[user.id+"_"+lt.id+"_h"]??hLim;
+            const usedH=db.lreqs.filter(r=>r.sid===user.id&&r.status==="approved"&&r.lid===lt.id&&(r.unit==="hour"||r.unit==="am"||r.unit==="pm")).reduce((acc,r)=>acc+(r.unit==="hour"?(r.hours||0):r.unit==="am"?4:5),0);
+            const remH=Math.max(0,hBal-usedH);
+            const remDays=Math.floor(remH/8);
+            const remHExtra=remH%8;
             const hc=remH<=0?"#DC2626":remH<=8?"#D97706":"#2563EB";
-            return `<div style="font-size:11px;color:${hc};margin-top:4px;font-weight:600;">時間使用可能 ${remH}h / 40h</div>`;
-          })():""}
+            return `<div style="font-size:11px;color:${hc};margin-top:4px;font-weight:600;">時間残 ${remH}h / ${hBal}h（約${remDays}日${remHExtra>0?"+"+remHExtra+"h":""}）</div>`;
+          })()}
         </div>`;
       }).join("")}
     </div>
@@ -729,7 +751,13 @@ function adminHTML(){
           var rem=db.lbal[key]??null;
           var color=rem===null?"#9CA3AF":rem<=0?"#DC2626":rem<=lt.days*0.3?"#D97706":"#059669";
           var display=rem===null?"未設定":rem+"日";
-          tableHTML+='<td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;background:'+bg+';"><span style="font-size:12px;font-weight:600;color:'+color+';">'+display+'</span></td>';
+          var hDisplay="";
+          var hLim3=getHLimit(lt,s);
+          if(hLim3){
+            var hBal2=db.lbal[key+"_h"]??null;
+            hDisplay=hBal2===null?'<br><span style="font-size:9px;color:#FCA5A5;">h未設定</span>':'<br><span style="font-size:9px;color:#2563EB;">'+hBal2+'h</span>';
+          }
+          tableHTML+='<td style="padding:7px 8px;border:1px solid #e2e8f0;text-align:center;background:'+bg+';"><span style="font-size:12px;font-weight:600;color:'+color+';">'+display+'</span>'+hDisplay+'</td>';
         });
         tableHTML+='</tr>';
       });
@@ -847,7 +875,7 @@ function staffHTML(){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
         <div style="font-size:13px;font-weight:600;">${s.name}</div>
-        <div style="font-size:11px;color:${T2};margin-top:2px;">${s.type==="fulltime"?"常勤":s.type==="shorttime"?"時短勤務":"パート"} · ${db.depts.find(d=>d.id===s.deptId)?.name||"所属なし"} · ${{staff:"スタッフ",leader:"リーダー",admin:"管理者",owner:"統括"}[s.role]||s.role}${s.position?" · "+s.position:""}${s.jobTypes&&s.jobTypes.length>0?" · "+s.jobTypes.join("・"):""}${user.role==="owner"?" · PIN:"+s.pin:""}${s.join?" · 入職:"+s.join:""}${db.assigns[s.id]?.autoMin!==undefined&&db.assigns[s.id]?.autoMin!==null?" · 自動休憩:"+(db.assigns[s.id].autoMin>0?db.assigns[s.id].autoMin+"分":"なし"):" · 自動休憩:<span style='color:#DC2626;'>未設定</span>"}</div>
+        <div style="font-size:11px;color:${T2};margin-top:2px;">${s.type==="fulltime"?"常勤":s.type==="shorttime"?"時短勤務":"パート"}(${s.contractHours||8}h) · ${db.depts.find(d=>d.id===s.deptId)?.name||"所属なし"} · ${{staff:"スタッフ",leader:"リーダー",admin:"管理者",owner:"統括"}[s.role]||s.role}${s.position?" · "+s.position:""}${s.jobTypes&&s.jobTypes.length>0?" · "+s.jobTypes.join("・"):""}${user.role==="owner"?" · PIN:"+s.pin:""}${s.join?" · 入職:"+s.join:""}${db.assigns[s.id]?.autoMin!==undefined&&db.assigns[s.id]?.autoMin!==null?" · 自動休憩:"+(db.assigns[s.id].autoMin>0?db.assigns[s.id].autoMin+"分":"なし"):" · 自動休憩:<span style='color:#DC2626;'>未設定</span>"}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px;">
         <button class="editS" data-id="${s.id}" style="border:1.5px solid ${A};background:#ebf8ff;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px;color:${A};">編集</button>
@@ -901,6 +929,11 @@ function staffWizardHTML(){
 
     html2+='<label class="lbl">入職日 *</label>';
     html2+='<input type="date" id="wz_join" class="inp" value="'+(wizardData.join||"")+'">';
+    html2+='<label class="lbl">契約勤務時間（時間/日） *</label>';
+    html2+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
+    html2+='<input type="number" id="wz_contractHours" class="inp" style="margin-bottom:0;" min="1" max="24" step="0.5" placeholder="例：8" value="'+(wizardData.contractHours!==undefined?wizardData.contractHours:8)+'">';
+    html2+='<span style="font-size:12px;color:#6B7280;white-space:nowrap;">時間/日</span>';
+    html2+='</div>';
     html2+='<label class="lbl">自動休憩時間（分） *</label>';
     html2+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
     html2+='<input type="number" id="wz_autoMin" class="inp" style="margin-bottom:0;" min="0" placeholder="例：60（0=なし）" value="'+(wizardData.autoMin!==undefined?wizardData.autoMin:60)+'">';
@@ -1092,7 +1125,7 @@ var autoMin2=parseInt(document.getElementById("wz_autoMin")?.value||0);
   if(btnDone)btnDone.onclick=function(){
     var newStaff={id:uid(),name:wizardData.name,furigana:wizardData.furigana||"",type:wizardData.type,deptId:wizardData.deptId,
       join:wizardData.join,role:wizardData.role,pin:wizardData.pin,
-      position:wizardData.position||"",jobTypes:wizardData.jobTypes||[]};
+      position:wizardData.position||"",jobTypes:wizardData.jobTypes||[],contractHours:wizardData.contractHours||8};
     db.staff.push(newStaff);
     // 残日数を設定
     if(wizardData.balances){
@@ -2918,14 +2951,25 @@ function balHTML(){
   <div style="font-size:12px;color:${T2};margin-bottom:12px;">有給発生時などに手動で更新してください</div>
   ${db.staff.map(s=>`<div class="card" style="margin-bottom:10px;">
     <div style="font-size:13px;font-weight:700;margin-bottom:10px;">${s.name}</div>
-    ${db.ltypes.filter(lt=>lt.days>0&&ltVisible(lt,s)).map(lt=>{
+    ${db.ltypes.filter(lt=>lt.days>=0).map(lt=>{
       const k=`${s.id}_${lt.id}`;const val=db.lbal[k]??lt.days;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1.5px solid ${BD};">
-        <span style="font-size:12px;color:${T2};">${lt.name}</span>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="number" class="balI" data-k="${k}" min="0" max="365" value="${val}" style="width:60px;padding:4px 8px;border:1.5px solid ${BD};border-radius:8px;font-size:13px;text-align:right;background:#fff;">
-          <span style="font-size:12px;color:${T2};">日</span>
+      const hLim2=getHLimit(lt,s);
+      const hk=`${s.id}_${lt.id}_h`;const hVal=hLim2?(db.lbal[hk]??hLim2):null;
+      return `<div style="padding:7px 0;border-bottom:1.5px solid ${BD};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${hLim2?"4px":"0"};">
+          <span style="font-size:12px;color:${T2};">${lt.name}</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" class="balI" data-k="${k}" min="0" max="365" value="${val}" style="width:60px;padding:4px 8px;border:1.5px solid ${BD};border-radius:8px;font-size:13px;text-align:right;background:#fff;">
+            <span style="font-size:12px;color:${T2};">日</span>
+          </div>
         </div>
+        ${hLim2?`<div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:#2563EB;">　└ 時間（上限${hLim2}h）</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" class="balI" data-k="${hk}" min="0" max="999" value="${hVal??hLim2}" style="width:60px;padding:4px 8px;border:1.5px solid #93C5FD;border-radius:8px;font-size:13px;text-align:right;background:#EFF6FF;margin-top:2px;">
+            <span style="font-size:12px;color:#2563EB;">h</span>
+          </div>
+        </div>`:""}
       </div>`;
     }).join("")}
   </div>`).join("")}`;
@@ -3365,6 +3409,11 @@ function bindMain(){
       </select>
       <label class="lbl">入職日</label>
       <input type="date" id="esJoin" class="inp" value="${s.join||""}">
+      <label class="lbl">契約勤務時間（時間/日） *</label>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <input type="number" id="esContractHours" class="inp" style="margin-bottom:0;" min="1" max="24" step="0.5" placeholder="例：8" value="${s.contractHours||8}">
+        <span style="font-size:12px;color:#6B7280;white-space:nowrap;">時間/日</span>
+      </div>
       <label class="lbl">自動休憩時間（分） *</label>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <input type="number" id="esAutoMin" class="inp" style="margin-bottom:0;" min="0" placeholder="例：60（0=なし）" value="${db.assigns[s.id]?.autoMin??60}">
@@ -3409,10 +3458,11 @@ function bindMain(){
       const jobTypes=Array.from(document.querySelectorAll(".esJobCheck:checked")).map(function(c){return c.value;});
       const autoMin=parseInt(document.getElementById("esAutoMin")?.value||0);
       const furigana=(document.getElementById("esFurigana")?.value||"").trim();
+      const contractHours=parseFloat(document.getElementById("esContractHours")?.value||8);
       if(!db.assigns[s.id])db.assigns[s.id]={};
       db.assigns[s.id].autoMin=autoMin;
       db.assigns[s.id].autoBreak=autoMin>0;
-      db.staff=db.staff.map(x=>x.id===s.id?{...x,name,furigana,type,deptId,join,role,pin,position,jobTypes}:x);
+      db.staff=db.staff.map(x=>x.id===s.id?{...x,name,furigana,contractHours,type,deptId,join,role,pin,position,jobTypes}:x);
       save();saveToCloud();modal.remove();render();toast(`${name}の情報を更新しました`);
     };
   });
@@ -3949,31 +3999,27 @@ function checkLeaveAlerts(){
     }
   });
 
-  // 時間有給リセットアラート（有給付与日から1年ごと）
-  const paidType=db.ltypes.find(t=>t.name==="有給休暇"||t.name==="有給");
-  if(paidType){
+  // 時間リセットアラート（hLimitがある全休暇・付与日から1年ごと）
+  db.ltypes.filter(function(lt){
+    return lt.cat==="paid"||lt.cat==="refresh"||lt.cat==="special_pre";
+  }).forEach(function(lt){
     db.staff.forEach(function(s){
       if(!s.join)return;
-      // 入職6ヶ月後が有給付与日→そこから1年ごとにリセット
+      var hLimCheck=getHLimit(lt,s);
+      if(!hLimCheck)return;
       var firstGrant=new Date(s.join);
       firstGrant.setMonth(firstGrant.getMonth()+6);
-      // 今年のリセット日を計算
       var today2=new Date(today);
       var resetDate=new Date(firstGrant);
       while(resetDate<=today2){
         var diff2=Math.round((today2-resetDate)/86400000);
         if(diff2>=0&&diff2<=14){
-          alerts.push({
-            type:"hourReset",
-            name:s.name,
-            resetDate:resetDate.toISOString().slice(0,10),
-            diff:diff2
-          });
+          alerts.push({type:"hourReset",name:s.name,ltName:lt.name,hLimit:hLimCheck,diff:diff2});
         }
         resetDate.setFullYear(resetDate.getFullYear()+1);
       }
     });
-  }
+  });
 
   if(alerts.length===0)return;
 
