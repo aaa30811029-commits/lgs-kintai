@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0049)file:///C:/Users/ne-65/Downloads/index%20(7).html -->
+<!-- saved from url=(0049)file:///C:/Users/ne-65/Downloads/index%20(9).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3439,7 +3439,10 @@ function bindMain(){
         <div><label class="lbl">出勤</label><input type="time" id="rCi" class="inp" style="margin-bottom:0;"></div>
         <div><label class="lbl">退勤</label><input type="time" id="rCo" class="inp" style="margin-bottom:0;"></div>
       </div>
-      <label class="lbl" style="margin-top:12px;">申請理由</label>
+      <label class="lbl" style="margin-top:12px;">休憩時間（分）任意</label>
+      <input type="number" id="rBrk" class="inp" min="0" step="5" placeholder="例：60（なければ0）" value="0">
+      <div id="rBrkNote" style="font-size:11px;color:#D97706;background:#FEF3C7;border-left:3px solid #F59E0B;padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:10px;display:none;"></div>
+      <label class="lbl">申請理由</label>
       <textarea id="rReason" class="inp" style="min-height:72px;resize:vertical;" placeholder="理由を記入してください"></textarea>
       <div style="display:flex;gap:10px;">
         <button id="rCancel" style="flex:1;padding:13px;border-radius:11px;border:1.5px solid ${BD};background:#f7fafc;cursor:pointer;font-size:14px;color:${T2};">キャンセル</button>
