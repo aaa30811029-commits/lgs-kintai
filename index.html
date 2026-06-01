@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0186)file:///C:/Users/ne-65/OneDrive%20-%20%E5%90%88%E5%90%8C%E4%BC%9A%E7%A4%BELGS/%E5%90%88%E5%90%8C%E4%BC%9A%E7%A4%BELGS/LGS%E5%8B%A4%E6%80%A0%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0/index.html -->
+<!-- saved from url=(0049)file:///C:/Users/ne-65/Downloads/index%20(5).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -161,8 +161,8 @@ function updatePinDots(){
 
 function getBal(sid,lid){const k=`${sid}_${lid}`;if(db.lbal[k]!==undefined)return db.lbal[k];const lt=db.ltypes.find(t=>t.id===lid);return lt?.days>0?lt.days:null;}
 function getUD(sid,lid){return db.lreqs.filter(r=>r.sid===sid&&r.lid===lid&&r.status==="approved").reduce((s,r)=>s+r.days,0);}
-function getTR(sid){const td=new Date().toLocaleDateString("ja-JP");return db.records.filter(r=>r.sid===sid&&new Date(r.ts[0]?.time||r.created).toLocaleDateString("ja-JP")===td);}
-function getLast(sid){const r=getTR(sid);return r.length?r[r.length-1]:null;}
+function getTR(sid){const td=new Date().toLocaleDateString("ja-JP",{timeZone:"Asia/Tokyo"});return db.records.filter(r=>r.sid===sid&&new Date(r.ts[0]?.time||r.created).toLocaleDateString("ja-JP",{timeZone:"Asia/Tokyo"})===td);}
+function getLast(sid){const all=db.records.filter(r=>r.sid===sid&&!r.done);return all.length?all[all.length-1]:null;}
 function getSt(sid){
   if(!sid)return{state:"none"};
   const rec=getLast(sid);
@@ -392,7 +392,7 @@ function stampHTML(){
   const dotColors={off:T3,working:G,rest:O,leave:P};
   const dotC=dotColors[st.state]||T3;
   const stLbl={none:"",off:"未出勤 / 退勤済み",working:"勤務中",rest:"休憩中",leave:"休暇中"}[st.state]||"";
-  const logs=getTR(sid);
+  const logs=db.records.filter(r=>r.sid===sid).slice(-5).reverse();
   return `<div class="card">
     <label class="lbl">スタッフ</label>
     <select id="stampSel" class="inp">
@@ -407,7 +407,13 @@ function stampHTML(){
         <span style="font-size:14px;font-weight:600;">${stLbl}</span>
         ${st.time?`<span style="font-size:12px;color:${T2};">${fmt(st.time)} 〜</span>`:""}
       </div>
-      ${logs.length?`<div style="margin-top:10px;border-top:1.5px solid ${BD};padding-top:9px;">${logs.flatMap(r=>r.ts.map(ts=>`<div style="display:flex;gap:10px;font-size:12px;padding:3px 0;color:${T2};"><span style="width:64px;">${{checkin:"出勤",checkout:"退勤",rest_start:"休憩開始",rest_end:"休憩終了"}[ts.type]}</span><span style="font-family:monospace;color:${T};">${fmt(ts.time)}</span></div>`)).join("")}</div>`:""}
+      ${logs.length?`<div style="margin-top:10px;border-top:1.5px solid ${BD};padding-top:9px;">${logs.flatMap(r=>r.ts.map(ts=>{
+              const d=new Date(ts.time);
+              const dateStr=d.toLocaleDateString("ja-JP",{timeZone:"Asia/Tokyo",month:"numeric",day:"numeric"});
+              const timeStr=d.toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"});
+              const label={checkin:"出勤",checkout:"退勤",rest_start:"休憩開始",rest_end:"休憩終了"}[ts.type];
+              return `<div style="display:flex;gap:10px;font-size:12px;padding:3px 0;color:${T2};"><span style="width:60px;">${label}</span><span style="font-family:monospace;color:${T3};width:44px;">${dateStr}</span><span style="font-family:monospace;color:${T};">${timeStr}</span></div>`;
+            })).join("")}</div>`:""}
     </div>
     <div style="display:flex;gap:10px;margin-bottom:10px;">
       <button class="sBtn" data-t="checkin" style="flex:1;padding:18px 6px;border-radius:12px;border:2px solid ${isOff?G:BD};background:${isOff?"#f0fff4":"transparent"};color:${isOff?G:T3};cursor:${isOff?"pointer":"not-allowed"};font-size:14px;font-weight:700;opacity:${isOff?1:0.3};transition:all 0.15s;">出勤</button>
