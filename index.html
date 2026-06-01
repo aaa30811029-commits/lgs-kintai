@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0049)file:///C:/Users/ne-65/Downloads/index%20(6).html -->
+<!-- saved from url=(0049)file:///C:/Users/ne-65/Downloads/index%20(7).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3395,6 +3395,11 @@ function bindMain(){
         mc2+='<input type="time" id="tcReqCiInp" value="'+ciTime+'" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:10px;">';
         mc2+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">修正後の退勤時刻</label>';
         mc2+='<input type="time" id="tcReqCoInp" value="'+coTime+'" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:10px;">';
+        const hasAutoBreak2=db.assigns[rec.sid]&&db.assigns[rec.sid].autoBreak&&db.assigns[rec.sid].autoMin>0;
+        const brkNote2=hasAutoBreak2?'予定と異なる休憩時間だった場合のみ入力してください':'休憩した場合は時間（分）を入力してください';
+        mc2+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">休憩時間（分）任意</label>';
+        mc2+='<input type="number" id="tcReqBrkInp" value="'+(rec.brk||0)+'" min="0" step="5" placeholder="例：60" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:14px;margin-bottom:6px;">';
+        mc2+='<div style="font-size:11px;color:#D97706;background:#FEF3C7;border-left:3px solid #F59E0B;padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:10px;">'+brkNote2+'</div>';
         mc2+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">出勤コメント（変更する場合）</label>';
         mc2+='<input type="text" id="tcReqCommentInp" value="'+(rec.comment||"")+'" placeholder="例：在宅、直行など" style="width:100%;padding:10px;border:1.5px solid '+BD+';border-radius:10px;font-size:13px;margin-bottom:10px;">';
         mc2+='<label style="font-size:12px;color:'+T2+';display:block;margin-bottom:4px;">修正理由（必須）</label>';
@@ -3409,12 +3414,13 @@ function bindMain(){
         document.getElementById("btnTcReq2Submit").onclick=function(){
           const newCi=document.getElementById("tcReqCiInp").value;
           const newCo=document.getElementById("tcReqCoInp").value;
+          const newBrk=parseInt(document.getElementById("tcReqBrkInp")?.value||0);
           const reason=document.getElementById("tcReqReasonInp").value.trim();
           if(!newCi||!newCo){toast("時刻を入力してください");return;}
           if(!reason){toast("修正理由を入力してください");return;}
           const newComment=document.getElementById("tcReqCommentInp")?.value||rec.comment||"";
           if(!db.tcreqs)db.tcreqs=[];
-          db.tcreqs.push({id:uid(),sid:user.id,rid:rec.id,oldCi:ciTime,oldCo:coTime,newCi,newCo,dateBase,reason,comment:newComment,status:"pending",at:now()});
+          db.tcreqs.push({id:uid(),sid:user.id,rid:rec.id,oldCi:ciTime,oldCo:coTime,newCi,newCo,newBrk,dateBase,reason,comment:newComment,status:"pending",at:now()});
           save();saveToCloud();modal2.remove();render();toast("打刻修正を申請しました。承認をお待ちください。");
         };
       };
@@ -3441,6 +3447,18 @@ function bindMain(){
       </div>
     </div>`;
     document.body.appendChild(modal);
+    // 注意書きを更新する関数
+    function updateBrkNote(){
+      const rsid=document.getElementById("rSid")?.value;
+      const note=document.getElementById("rBrkNote");
+      if(!note)return;
+      const asgn=db.assigns[rsid]||{};
+      const hasAuto=asgn.autoBreak&&asgn.autoMin>0;
+      note.textContent=hasAuto?"予定と異なる休憩時間だった場合のみ入力してください":"休憩した場合は時間（分）を入力してください";
+      note.style.display=rsid?"block":"none";
+    }
+    updateBrkNote();
+    document.getElementById("rSid").onchange=updateBrkNote;
     document.getElementById("rCancel").onclick=()=>modal.remove();
     document.getElementById("rSubmit").onclick=()=>{
       const rsid=document.getElementById("rSid").value,rdate=document.getElementById("rDate").value,rci=document.getElementById("rCi").value,rco=document.getElementById("rCo").value,rr=document.getElementById("rReason").value.trim();
@@ -4284,4 +4302,4 @@ async function initApp(){
 
 initApp();
 
-</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">データを読み込み中...</div></body></html>
+</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
