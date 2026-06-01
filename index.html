@@ -4145,10 +4145,11 @@ async function saveToCloud(){
 async function cloudAction(action, payload){
   const url="https://script.google.com/macros/s/AKfycbzKbUDjhhLI3SuRDbmQcEtfRhqBN5JHCywh0oDZ4nEKXiERv6vWUqGhD9mHomYMT7aB/exec";
   try{
+    const body="sheetId="+encodeURIComponent(SHEET_ID)+"&action="+encodeURIComponent(action)+"&payload="+encodeURIComponent(typeof payload==="string"?payload:JSON.stringify(payload));
     await fetch(url,{
       method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({sheetId:SHEET_ID,action:action,payload:payload})
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:body
     });
   }catch(e){console.log("cloud action error",e);}
 }
