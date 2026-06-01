@@ -4145,14 +4145,13 @@ async function saveToCloud(){
 async function cloudAction(action, payload){
   const url="https://script.google.com/macros/s/AKfycbzKbUDjhhLI3SuRDbmQcEtfRhqBN5JHCywh0oDZ4nEKXiERv6vWUqGhD9mHomYMT7aB/exec";
   try{
-    const formData=new FormData();
-    formData.append("sheetId",SHEET_ID);
-    formData.append("action",action);
-    formData.append("payload",typeof payload==="string"?payload:JSON.stringify(payload));
-    await fetch(url,{
+    const params=new URLSearchParams();
+    params.append("sheetId",SHEET_ID);
+    params.append("action",action);
+    params.append("payload",typeof payload==="string"?payload:JSON.stringify(payload));
+    await fetch(url+"?"+params.toString(),{
       method:"POST",
-      mode:"no-cors",
-      body:formData
+      mode:"no-cors"
     });
   }catch(e){console.log("cloud action error",e);}
 }
