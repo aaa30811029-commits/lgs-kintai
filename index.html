@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(22).html -->
+<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(26).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -341,7 +341,7 @@ function loginHTML(){
 }
 
 function mainHTML(){
-  const tabs=[["stamp","打刻"],["mypage","マイ"],["leave","休暇申請"],["welfare","福利厚生"],["expense","経費精算"],["overtime","時間外訪問"],["shift","シフト"]];
+  const tabs=[["stamp","打刻"],["mypage","マイ"],["myapply","申請一覧"],["leave","休暇申請"],["welfare","福利厚生"],["expense","経費精算"],["overtime","時間外訪問"],["shift","シフト"]];
   if(user.role==="leader"||user.role==="admin"||user.role==="owner")tabs.push(["admin","管理"]);
   if(user.role==="admin"||user.role==="owner")tabs.push(["settings","設定"]);
   const isOwner=user.role==="owner";
@@ -375,6 +375,7 @@ function mainHTML(){
 
 function pageHTML(){
   if(page==="stamp")return stampHTML();
+  if(page==="myapply")return myapplyHTML();
   if(page==="mypage")return mypageHTML();
   if(page==="leave")return leaveHTML();
   if(page==="admin")return adminHTML();
@@ -436,6 +437,64 @@ function stampHTML(){
     })()}
     <button id="btnRetro" style="width:100%;padding:11px;border:1.5px dashed ${BD};border-radius:10px;background:transparent;color:${T2};cursor:pointer;font-size:13px;">⏱ 打刻してない日の申請（押し忘れ）</button>
     <button id="btnTcReq" style="width:100%;padding:11px;border:1.5px dashed ${A};border-radius:10px;background:#ebf8ff;color:${A};cursor:pointer;font-size:13px;margin-top:6px;">✏️ 打刻した時刻の修正申請</button>
+  </div>`;
+}
+
+function myapplyHTML(){
+  const sid=user.id;
+  const items=[];
+  const sc={pending:O,approved:G,rejected:R,approved1:A};
+  const sl={pending:"申請中",approved:"承認済み",rejected:"却下",approved1:"1次承認"};
+  const curMonth=new Date().toISOString().slice(0,7);
+  const inMonth=(dateStr)=>dateStr&&dateStr.slice(0,7)===curMonth;
+
+  // 打刻押し忘れ申請
+  (db.retros||[]).filter(r=>r.sid===sid&&inMonth(r.date)).slice().reverse().forEach(r=>{
+    items.push({label:"⏱ 押し忘れ",detail:`${r.date} ${r.ci}〜${r.co}`,sub:r.reason||"",status:r.status,at:r.at});
+  });
+  // 打刻修正申請
+  (db.tcreqs||[]).filter(r=>r.sid===sid&&inMonth(r.dateBase)).slice().reverse().forEach(r=>{
+    items.push({label:"✏️ 打刻修正",detail:`${r.dateBase} ${r.oldCi}→${r.newCi}`,sub:r.reason||"",status:r.status,at:r.at});
+  });
+  // 休暇申請
+  (db.lreqs||[]).filter(r=>r.sid===sid&&inMonth(r.ds)).slice().reverse().forEach(r=>{
+    const lt=db.ltypes.find(t=>t.id===r.lid);
+    items.push({label:`🌴 ${lt?.name||"休暇"}`,detail:`${r.ds}${r.ds!==r.de?" 〜 "+r.de:""} / ${r.unit==="hour"?r.hours+"時間":r.days+"日"}`,sub:r.note||"",status:r.status,at:r.at});
+  });
+  // 福利厚生申請
+  (db.wreqs||[]).filter(r=>r.sid===sid&&inMonth(r.at)).slice().reverse().forEach(r=>{
+    const typeLabel={community:"地域貢献",book:"書籍購入",training:"研修参加"};
+    const tl=typeLabel[r.wtype]||r.wtype||"";
+    const detail=r.data?(r.data.orgName||r.data.name||"")+(r.data.date?" / "+r.data.date:""):"";
+    items.push({label:"🎁 福利厚生",detail:tl+(detail?" / "+detail:""),sub:"",status:r.status,at:r.at});
+  });
+  // 経費精算
+  (db.expenses||[]).filter(e=>e.sid===sid&&inMonth(e.date)).slice().reverse().forEach(e=>{
+    items.push({label:"💴 経費精算",detail:`¥${parseInt(e.amount).toLocaleString()} / ${e.content}`,sub:e.rejectComment||"",status:e.status,at:e.at});
+  });
+  // 時間外訪問
+  (db.overtimes||[]).filter(o=>o.sid===sid&&inMonth(o.month+"-01")).slice().reverse().forEach(ot=>{
+    (ot.items||[]).forEach(item=>{
+      items.push({label:"🚗 時間外訪問",detail:`${item.patient} ${item.date} ${item.start}〜${item.end}`,sub:item.rejectComment||"",status:item.status,at:item.at});
+    });
+  });
+
+  // 日付順（新しい順）
+  items.sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
+
+  return `<div style="padding:0 0 80px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:14px;">📋 申請一覧（${curMonth.replace("-","年")}月）</div>
+    ${items.length===0
+      ? `<div style="text-align:center;color:${T2};font-size:13px;padding:40px 0;">申請がありません</div>`
+      : items.map(h=>`<div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <span style="font-size:12px;background:${A}15;color:${A};padding:2px 8px;border-radius:8px;">${h.label}</span>
+            <span style="background:${sc[h.status]||T2}20;color:${sc[h.status]||T2};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;">${sl[h.status]||h.status}</span>
+          </div>
+          <div style="font-size:13px;font-weight:600;margin:4px 0;">${h.detail}</div>
+          ${h.sub?`<div style="font-size:11px;color:${T2};">${h.sub}</div>`:""}
+        </div>`).join("")
+    }
   </div>`;
 }
 
@@ -642,6 +701,7 @@ function adminHTML(){
   // 履歴（承認済み・却下済み）- コンパクト表示
   const histItems=[];
   db.retros.filter(r=>r.status!=="pending").forEach(r=>{const s=db.staff.find(x=>x.id===r.sid);histItems.push({label:"打刻",name:s?.name||"",detail:`${r.date}`,status:r.status});});
+  (db.tcreqs||[]).filter(r=>r.status!=="pending").forEach(r=>{const s=db.staff.find(x=>x.id===r.sid);histItems.push({label:"打刻修正",name:s?.name||"",detail:`${r.dateBase} ${r.oldCi}→${r.newCi}`,status:r.status});});
   db.lreqs.filter(r=>r.status!=="pending").forEach(r=>{const s=db.staff.find(x=>x.id===r.sid);const lt=db.ltypes.find(t=>t.id===r.lid);histItems.push({label:"休暇",name:s?.name||"",detail:`${lt?.name} ${r.ds}`,status:r.status});});
   (db.wreqs||[]).filter(r=>r.status!=="pending").forEach(r=>{const s=db.staff.find(x=>x.id===r.sid);histItems.push({label:"福利厚生",name:s?.name||"",detail:typeLabel[r.wtype]||r.wtype,status:r.status});});
   if(isAdminPlus){
@@ -4324,4 +4384,4 @@ async function initApp(){
 
 initApp();
 
-</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
+</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">データを読み込み中...</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
