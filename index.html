@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(19).html -->
+<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(20).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1552,7 +1552,7 @@ function bindWelfareEvents(){
       const canAct=(user.role==="leader"||user.role==="admin")&&req.status==="pending";
       return `<div class="card" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;"><div><span style="font-size:13px;font-weight:700;">${s?.name}</span><span style="font-size:11px;color:${T2};margin-left:6px;">${td2}</span></div><span style="background:${sc}20;color:${sc};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;">${sl}</span></div><div style="font-size:12px;color:${T2};margin-bottom:${canAct?8:0}px;">${req.summary}${req.note?" / "+req.note:""}</div>${canAct?`<div style="display:flex;gap:8px;"><button class="wAct2" data-id="${req.id}" data-st="approved" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${G};color:${G};background:#f0fff4;cursor:pointer;font-size:13px;">承認</button><button class="wAct2" data-id="${req.id}" data-st="rejected" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${R};color:${R};background:#fff5f5;cursor:pointer;font-size:13px;">却下</button></div>`:""}</div>`;
     }).join("")||`<div style="text-align:center;color:${T2};font-size:12px;padding:30px 0;">申請がありません</div>`;}
-    document.querySelectorAll(".wAct2").forEach(b=>b.onclick=()=>{const req=db.wreqs.find(r=>r.id===b.dataset.id);if(req){req.status=b.dataset.st;const updatedWReq=req;save();cloudAction("fullSave",JSON.stringify(db));render();toast(b.dataset.st==="approved"?"承認しました":"却下しました");}});
+    document.querySelectorAll(".wAct2").forEach(b=>b.onclick=()=>{const req=db.wreqs.find(r=>r.id===b.dataset.id);if(req){req.status=b.dataset.st;save();cloudAction("updateWReq",req);render();toast(b.dataset.st==="approved"?"承認しました":"却下しました");}});
   };
 
   // CSV出力
@@ -1670,7 +1670,7 @@ function bindExpenseEvents(){
     if(!db.expenses)db.expenses=[];
     db.expenses.push({id:uid(),sid,date,content,amount:parseInt(amount),note,status:"pending",at:now()});
     const lastExp2=db.expenses[db.expenses.length-1];
-    save();cloudAction("fullSave",JSON.stringify(db));expTab="list";render();toast("経費精算を申請しました");
+    save();cloudAction("addExpense",db.expenses[db.expenses.length-1]);expTab="list";render();toast("経費精算を申請しました");
   };
   document.querySelectorAll(".expApprove").forEach(b=>b.onclick=()=>{
     const exp=db.expenses?.find(e=>e.id===b.dataset.id);if(!exp)return;
@@ -1850,7 +1850,7 @@ function bindOvertimeEvents(){
     };
     if(!db.overtimes)db.overtimes=[];
     db.overtimes.push(item);
-    save();cloudAction("fullSave",JSON.stringify(db));render();toast("下書き保存しました");
+    save();cloudAction("addOvertime",db.overtimes[db.overtimes.length-1]);render();toast("下書き保存しました");
   };
 
   // 下書き削除
@@ -2330,7 +2330,8 @@ function bindShiftEvents(){
   // 希望保存ボタン
   var btnHopeSave=document.getElementById("btnHopeSave");
   if(btnHopeSave)btnHopeSave.onclick=function(){
-    save();cloudAction("fullSave",JSON.stringify(db));toast("シフト希望を保存しました");render();
+    const myKey=user.id+"_"+shiftMonth;
+    save();cloudAction("updateShiftReq",{key:myKey,data:db.shiftReqs[myKey]||{}});toast("シフト希望を保存しました");render();
   };
   var btnHopePrev=document.getElementById("btnHopePrevMonth");
   if(btnHopePrev)btnHopePrev.onclick=function(){
@@ -3332,15 +3333,15 @@ function bindMain(){
       document.getElementById("btnCiCancel").onclick=()=>modal.remove();
       document.getElementById("btnCiOk").onclick=()=>{
         const comment=document.getElementById("ciCommentInp").value||"";
-        db.records.push({id:uid(),sid,rid:null,ts:[{type:"checkin",time:n}],done:false,co:null,brk:0,created:n,comment});
-        const newRec2=db.records[db.records.length-1];
-        save();cloudAction("fullSave",JSON.stringify(db));modal.remove();render();toast(`出勤を記録しました (${fmt(n)})`);
+        const newRec={id:uid(),sid,rid:null,ts:[{type:"checkin",time:n}],done:false,co:null,brk:0,created:n,comment};
+        db.records.push(newRec);
+        save();cloudAction("addRecord",newRec);modal.remove();render();toast(`出勤を記録しました (${fmt(n)})`);
       };
       setTimeout(()=>document.getElementById("ciCommentInp")?.focus(),100);
     }else{
       const rec=getLast(sid);if(!rec){toast("出勤打刻がありません");return;}
       rec.ts.push({type,time:n});if(type==="checkout"){rec.done=true;rec.co=n;}
-      save();cloudAction("fullSave",JSON.stringify(db));render();toast(`${{checkout:"退勤",rest_start:"休憩開始",rest_end:"休憩終了"}[type]}を記録しました (${fmt(n)})`);
+      save();cloudAction("updateRecord",rec);render();toast(`${{checkout:"退勤",rest_start:"休憩開始",rest_end:"休憩終了"}[type]}を記録しました (${fmt(n)})`);
     }
   });
   // 打刻修正申請ボタン
@@ -3427,7 +3428,7 @@ function bindMain(){
           if(!db.tcreqs)db.tcreqs=[];
           const newTcReq={id:uid(),sid:user.id,rid:rec.id,oldCi:ciTime,oldCo:coTime,newCi,newCo,newBrk,dateBase,reason,comment:newComment,status:"pending",at:now()};
           db.tcreqs.push(newTcReq);
-          save();cloudAction("fullSave",JSON.stringify(db));modal2.remove();render();toast("打刻修正を申請しました。承認をお待ちください。");
+          save();cloudAction("addTcReq",newTcReq);modal2.remove();render();toast("打刻修正を申請しました。承認をお待ちください。");
         };
       };
     });
@@ -3477,7 +3478,7 @@ function bindMain(){
       const rbrk=parseInt(document.getElementById("rBrk")?.value||0);
       const newRetro={id:uid(),sid:rsid,date:rdate,ci:rci,co:rco,brk:rbrk,reason:rr,status:"pending",at:now()};
       db.retros.push(newRetro);
-      save();cloudAction("fullSave",JSON.stringify(db));modal.remove();toast("打刻申請を送信しました");
+      save();cloudAction("addRetro",newRetro);modal.remove();toast("打刻申請を送信しました");
     };
   };
   const bL=document.getElementById("btnLvSubmit");
@@ -3519,9 +3520,9 @@ function bindMain(){
     }
     const newLReq2={id:uid(),sid,lid,ds,de,unit,hours,days,note,status:"pending",at:now()};
     db.lreqs.push(newLReq2);
-    save();cloudAction("fullSave",JSON.stringify(db));render();toast("申請しました");
+    save();cloudAction("addLReq",newLReq2);render();toast("申請しました");
   };
-  document.querySelectorAll(".lvAct").forEach(b=>b.onclick=()=>{const req=db.lreqs.find(r=>r.id===b.dataset.id);if(req){req.status=b.dataset.st;save();cloudAction("fullSave",JSON.stringify(db));render();toast(b.dataset.st==="approved"?"承認しました":"却下しました");}});
+  document.querySelectorAll(".lvAct").forEach(b=>b.onclick=()=>{const req=db.lreqs.find(r=>r.id===b.dataset.id);if(req){req.status=b.dataset.st;save();cloudAction("updateLReq",req);render();toast(b.dataset.st==="approved"?"承認しました":"却下しました");}});
   // 統合承認イベント
   function handleApprove(kind,id,otId,sid){
     const isOwner=user.role==="owner";
@@ -3740,7 +3741,7 @@ function bindMain(){
     const newLType={id:uid(),name,cat,days,depts:[],mode:"all"};db.ltypes.push(newLType);save();cloudAction("fullSave",JSON.stringify(db));render();toast(`「${name}」を追加しました`);
   };
   document.querySelectorAll(".delL").forEach(b=>b.onclick=()=>{const delLTypeId=b.dataset.id;db.ltypes=db.ltypes.filter(lt=>lt.id!==delLTypeId);save();cloudAction("fullSave",JSON.stringify(db));render();});
-  document.querySelectorAll(".balI").forEach(inp=>inp.onchange=e=>{const balKey=inp.dataset.k;const balVal=parseFloat(e.target.value)||0;db.lbal[balKey]=balVal;save();cloudAction("fullSave",JSON.stringify(db));});
+  document.querySelectorAll(".balI").forEach(inp=>inp.onchange=e=>{const balKey=inp.dataset.k;const balVal=parseFloat(e.target.value)||0;db.lbal[balKey]=balVal;save();cloudAction("updateLBal",{[balKey]:balVal});});
   // GASイベント
   const btnSaveGas=document.getElementById("btnSaveGas");
   if(btnSaveGas)btnSaveGas.onclick=async()=>{
@@ -3793,7 +3794,7 @@ function bindMain(){
     if(!/^\d{4}$/.test(newPin)){toast("新しいPINは4桁の数字で入力してください");return;}
     if(newPin!==newPin2){toast("新しいPINが一致しません");return;}
     s.pin=newPin;user.pin=newPin;
-    save();cloudAction("fullSave",JSON.stringify(db));toast("PINを変更しました");
+    save();cloudAction("updatePin",{sid:user.id,pin:db.staff.find(s=>s.id===user.id)?.pin});toast("PINを変更しました");
     document.getElementById("myPinOld").value="";
     document.getElementById("myPinNew").value="";
     document.getElementById("myPinNew2").value="";
@@ -4152,8 +4153,8 @@ async function saveToCloud(){
 async function cloudAction(action, payload){
   const url="https://script.google.com/macros/s/AKfycbzKbUDjhhLI3SuRDbmQcEtfRhqBN5JHCywh0oDZ4nEKXiERv6vWUqGhD9mHomYMT7aB/exec";
   try{
-    const params="sheetId="+encodeURIComponent(SHEET_ID)+"&action="+encodeURIComponent(action)+"&payload="+encodeURIComponent(typeof payload==="string"?payload:JSON.stringify(payload));
-    await fetch(url+"?"+params,{method:"GET",mode:"no-cors"});
+    const body=JSON.stringify({sheetId:SHEET_ID,action:action,payload:typeof payload==="string"?payload:JSON.stringify(payload)});
+    await fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:body});
   }catch(e){console.log("cloud action error",e);}
 }
 
@@ -4322,4 +4323,4 @@ async function initApp(){
 
 initApp();
 
-</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
+</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
