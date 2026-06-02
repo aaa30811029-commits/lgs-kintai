@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(26).html -->
+<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(29).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4193,15 +4193,21 @@ const SHEET_ID="1nx3TqEUdA91a65Q4XmPpJYJva6gv8xfPzw2faQXdHeo";
 
 async function loadFromCloud(){
   const url="https://script.google.com/macros/s/AKfycbxsJOqqqTg-PU0Fn7lirTceESsUlsuGiOIo5Q6J5BJGnUSQyl-pyFjl0YZkr3CIS8CA_Q/exec";
-  try{
-    const res=await fetch(url+"?sheetId="+SHEET_ID);
-    const json=await res.json();
-    if(json.data&&json.data.length>2){
-      db=migrate(JSON.parse(json.data));
-      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
-      return true;
+  const maxRetry=3;
+  for(let i=0;i<maxRetry;i++){
+    try{
+      const res=await fetch(url+"?sheetId="+SHEET_ID);
+      const json=await res.json();
+      if(json.data&&json.data.length>2){
+        db=migrate(JSON.parse(json.data));
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
+        return true;
+      }
+    }catch(e){
+      console.log("cloud load error (attempt "+(i+1)+")",e);
+      if(i<maxRetry-1)await new Promise(r=>setTimeout(r,2000));
     }
-  }catch(e){console.log("cloud load error",e);}
+  }
   return false;
 }
 
@@ -4366,22 +4372,29 @@ function checkLeaveAlerts(){
 }
 
 async function initApp(){
-  if(true){
-    toast("データを読み込み中...");
-    const ok=await loadFromCloud();
-    if(ok)toast("クラウドから読み込みました");
+  toast("データを読み込み中...");
+  const ok=await loadFromCloud();
+  if(ok){
+    toast("クラウドから読み込みました");
+  }else{
+    toast("通信エラー。再読み込みしてください");
   }
   if(!db.staff.length&&!user){
-    user={id:"__setup__",name:"初回設定",role:"admin",pin:"0000"};
-    page="settings";stab="bal";render();
-    setTimeout(()=>toast("まずGAS URLを設定してからスタッフを登録してください"),500);
+    if(ok){
+      // クラウド読み込み成功してもスタッフがいない→初回設定
+      user={id:"__setup__",name:"初回設定",role:"admin",pin:"0000"};
+      page="settings";stab="bal";render();
+      setTimeout(()=>toast("まずGAS URLを設定してからスタッフを登録してください"),500);
+    }else{
+      // 通信失敗でスタッフがいない→再読み込み促す
+      document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;padding:20px;"><div style="font-size:16px;font-weight:700;color:#1a202c;">通信エラー</div><div style="font-size:13px;color:#718096;text-align:center;">データを読み込めませんでした。<br>ネットワーク接続を確認して<br>ページを再読み込みしてください。</div><button onclick="location.reload()" style="padding:12px 24px;border-radius:10px;border:none;background:#4299e1;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">再読み込み</button></div>';
+    }
   }else{
     render();
-    // 有給・特別休暇アラートチェック
     setTimeout(checkLeaveAlerts,800);
   }
 }
 
 initApp();
 
-</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">データを読み込み中...</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
+</script><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">通信エラー。再読み込みしてください</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div><div id="_t" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgb(45, 55, 72); color: rgb(255, 255, 255); padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 12px; display: none;">クラウドから読み込みました</div></body></html>
