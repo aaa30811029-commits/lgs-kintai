@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(32).html -->
+<!-- saved from url=(0050)file:///C:/Users/ne-65/Downloads/index%20(38).html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -353,6 +353,7 @@ function mainHTML(){
     +(isAdminPlus?(db.overtimes?.filter(o=>o.items?.some(i=>i.status==="pending"||(i.status==="approved1"&&isOwner))).length||0):0);
   const dept=db.depts.find(d=>d.id===user.deptId);
   const logoSrc=getLogoSrc(dept?.logo||"");
+  const syncTime=window._lastSyncTime||"";
   return `<div style="min-height:100vh;display:flex;flex-direction:column;background:${BG};">
     <div style="background:#fff;border-bottom:1.5px solid ${BD};padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -360,6 +361,7 @@ function mainHTML(){
         ${logoSrc?`<img src="${logoSrc}" style="height:24px;object-fit:contain;opacity:0.85;">`:``}
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
+        ${syncTime?`<span style="font-size:10px;color:${T2};">↺ 最終同期 ${syncTime}</span>`:""}
         <span style="font-size:12px;background:#ebf8ff;color:${A};padding:3px 9px;border-radius:20px;font-weight:500;">${user.name}</span>
         <button id="btnLogout" style="border:1.5px solid ${BD};background:transparent;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px;color:${T2};">ログアウト</button>
       </div>
@@ -4199,6 +4201,8 @@ async function loadFromCloud(){
     if(json.data&&json.data.length>2){
       db=migrate(JSON.parse(json.data));
       try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}
+      const now=new Date();
+      window._lastSyncTime=now.getHours().toString().padStart(2,"0")+":"+now.getMinutes().toString().padStart(2,"0");
       return true;
     }
   }catch(e){console.log("cloud load error",e);}
