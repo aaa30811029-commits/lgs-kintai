@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_115.html -->
+<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_116.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4231,6 +4231,7 @@ async function cloudAction(action, payload){
       console.log("cloudAction blocked: empty db");
       return;
     }
+    console.log("cloudAction fullSave: staff="+check.staff.length+" payloadSize="+JSON.stringify(check).length);
   }
   const url="https://script.google.com/macros/s/AKfycbxsJOqqqTg-PU0Fn7lirTceESsUlsuGiOIo5Q6J5BJGnUSQyl-pyFjl0YZkr3CIS8CA_Q/exec";
   try{
