@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_121.html -->
+<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_127.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -651,6 +651,7 @@ function adminNavHTML(){
   const tabs2=[["pending","承認待ち"],["history","履歴"],["csv","CSV出力"]];
   if(user.role==="admin"||user.role==="owner")tabs2.push(["timefix","TC修正"]);
   tabs2.push(["balview","残日数一覧"]);
+  if(user.role==="admin"||user.role==="owner")tabs2.push(["tcbulk","TC一括入力"]);
   tabs2.push(["paidledger","有給台帳"]);
   return `<div style="display:flex;overflow-x:auto;border-bottom:1.5px solid ${BD};margin-bottom:14px;">
     ${tabs2.map(([k,l])=>`<button class="adminSubBtn" data-t="${k}" style="padding:10px 14px;border:none;border-bottom:${adminSubTab===k?`2.5px solid ${A}`:"2.5px solid transparent"};background:transparent;cursor:pointer;font-size:13px;color:${adminSubTab===k?A:T2};font-weight:${adminSubTab===k?700:400};white-space:nowrap;">${l}</button>`).join("")}
@@ -917,6 +918,10 @@ function adminHTML(){
       ${adminNavHTML()}
       ${timefixHTML()}
     </div>`;
+  }
+
+  if(adminSubTab==="tcbulk"){
+    return `<div>${adminNavHTML()}${tcBulkHTML()}</div>`;
   }
 
   return `<div>
@@ -3001,6 +3006,106 @@ let tfTab="fix"; // fix | history
 let tfMonth=new Date().toISOString().slice(0,7);
 let tfStaff=user?.id||"";
 
+
+// ===== TC一括入力 =====
+let tcBulkDept = "";
+let tcBulkMonth = "";
+
+function tcBulkHTML(){
+  const today = new Date();
+  const thisYear = today.getFullYear();
+  const thisMonth = today.getMonth()+1;
+  if(!tcBulkMonth) tcBulkMonth = `${thisYear}-${String(thisMonth).padStart(2,"0")}`;
+
+  // 月の選択肢（過去6ヶ月）
+  const monthOpts = [];
+  for(let i=0;i<6;i++){
+    let d=new Date(thisYear,thisMonth-1-i,1);
+    const y=d.getFullYear(),m=d.getMonth()+1;
+    const val=`${y}-${String(m).padStart(2,'0')}`;
+    const label=`${y}年${m}月`;
+    monthOpts.push(`<option value="${val}" ${tcBulkMonth===val?'selected':''}>${label}</option>`);
+  }
+
+  // 部署選択肢
+  const deptOpts = db.depts.map(d=>`<option value="${d.id}" ${tcBulkDept===d.id?'selected':''}>${d.name}</option>`).join('');
+
+  // 選択部署のスタッフ
+  const staffList = tcBulkDept ? db.staff.filter(s=>s.deptId===tcBulkDept) : [];
+
+  // 月の日数と日付リスト
+  const [bulkY, bulkM] = tcBulkMonth ? tcBulkMonth.split('-').map(Number) : [thisYear, thisMonth];
+  const daysInMonth = new Date(bulkY, bulkM, 0).getDate();
+  const days = Array.from({length:daysInMonth},(_,i)=>i+1);
+
+  // 既存records（この月この部署）
+  const monthPrefix = tcBulkMonth+'-';
+  const existingRecs = db.records.filter(r=>{
+    const ci=r.ts.find(t=>t.type==='checkin');
+    return ci && ci.time.startsWith(monthPrefix) && staffList.some(s=>s.id===r.sid);
+  });
+
+  // 日付ヘッダー（土日判定）
+  const dayHeaders = days.map(d=>{
+    const dow = new Date(bulkY,bulkM-1,d).getDay();
+    const isSun=dow===0,isSat=dow===6;
+    const dayNames=['日','月','火','水','木','金','土'];
+    const bg=isSun?`background:${R}22;`:(isSat?`background:${BD};`:'');
+    const color=isSun?`color:${R};`:(isSat?`color:${T2};`:'');
+    return `<th style="padding:6px 2px;text-align:center;border:1px solid ${BD};min-width:56px;font-size:11px;${bg}${color}">${d}<br><span style="font-size:10px;">${dayNames[dow]}</span></th>`;
+  }).join('');
+
+  // スタッフ行
+  const staffRows = staffList.map(s=>{
+    const cells = days.map(d=>{
+      const dateStr=`${tcBulkMonth}-${String(d).padStart(2,'0')}`;
+      const dow=new Date(bulkY,bulkM-1,d).getDay();
+      const isSun=dow===0,isSat=dow===6;
+      const bg=isSun?`background:${R}22;`:(isSat?`background:${BD};`:'');
+
+      // 既存レコード
+      const rec=existingRecs.find(r=>r.sid===s.id&&r.ts.find(t=>t.type==='checkin')?.time.startsWith(dateStr));
+      const ciVal=rec?rec.ts.find(t=>t.type==='checkin')?.time.slice(11,16):'';
+      const coVal=rec&&rec.co?rec.co.slice(11,16):'';
+      const recId=rec?rec.id:'';
+
+      return `<td style="padding:2px;border:1px solid ${BD};${bg}">
+        <div style="display:flex;flex-direction:column;gap:1px;">
+          <input type="text" class="tcbulk-ci" data-sid="${s.id}" data-date="${dateStr}" data-rid="${recId}" placeholder="出勤" value="${ciVal}" style="width:50px;font-size:11px;padding:2px 3px;border:1px solid ${BD};border-radius:3px;text-align:center;">
+          <input type="text" class="tcbulk-co" data-sid="${s.id}" data-date="${dateStr}" data-rid="${recId}" placeholder="退勤" value="${coVal}" style="width:50px;font-size:11px;padding:2px 3px;border:1px solid ${BD};border-radius:3px;text-align:center;">
+          <input type="number" class="tcbulk-brk" data-sid="${s.id}" data-date="${dateStr}" data-rid="${recId}" placeholder="休憩" value="${rec?rec.brk:''}" min="0" style="width:50px;font-size:11px;padding:2px 3px;border:1px solid ${BD};border-radius:3px;text-align:center;">
+        </div>
+      </td>`;
+    }).join('');
+    return `<tr><td style="padding:6px 8px;border:1px solid ${BD};font-size:12px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:${BG};">${s.name}</td>${cells}</tr>`;
+  }).join('');
+
+  return `
+  <div class="card">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <select id="tcBulkDeptSel" style="font-size:13px;padding:6px 10px;border:1px solid ${BD};border-radius:6px;background:${BG};color:${T};">
+        <option value="">部署を選択</option>
+        ${deptOpts}
+      </select>
+      <select id="tcBulkMonthSel" style="font-size:13px;padding:6px 10px;border:1px solid ${BD};border-radius:6px;background:${BG};color:${T};">
+        ${monthOpts.join('')}
+      </select>
+      <button id="tcBulkSave" style="padding:6px 16px;background:${A};color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto;">一括保存</button>
+    </div>
+    ${staffList.length===0?`<div style="text-align:center;color:${T2};font-size:13px;padding:24px 0;">部署を選択してください</div>`:`
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse;font-size:12px;">
+        <thead><tr>
+          <th style="padding:6px 8px;text-align:left;border:1px solid ${BD};position:sticky;left:0;background:${BG};min-width:80px;">氏名</th>
+          ${dayHeaders}
+        </tr></thead>
+        <tbody>${staffRows}</tbody>
+      </table>
+    </div>`}
+  </div>`;
+}
+
+
 function timefixHTML(){
   const deptStaff=tfStaff?db.records.filter(r=>r.sid===tfStaff):[];
   const monthRecs=db.records.filter(function(r){
@@ -3879,6 +3984,54 @@ function bindMain(){
   // 管理タブのサブタブ切り替え
   document.querySelectorAll(".adminSubBtn").forEach(b=>b.onclick=()=>{adminSubTab=b.dataset.t;render();});
   if(adminSubTab==="timefix")bindTimefixEvents();
+
+  // TC一括入力イベント
+  if(adminSubTab==="tcbulk"){
+    var deptSel=document.getElementById("tcBulkDeptSel");
+    if(deptSel)deptSel.onchange=function(){tcBulkDept=this.value;render();};
+    var monthSel=document.getElementById("tcBulkMonthSel");
+    if(monthSel)monthSel.onchange=function(){tcBulkMonth=this.value;render();};
+    var saveBtn=document.getElementById("tcBulkSave");
+    if(saveBtn)saveBtn.onclick=function(){
+      var inputs=document.querySelectorAll(".tcbulk-ci");
+      var saved=0,skipped=0;
+      inputs.forEach(function(ciInp){
+        var sid=ciInp.dataset.sid;
+        var date=ciInp.dataset.date;
+        var rid=ciInp.dataset.rid;
+        var ci=ciInp.value.trim().replace("：",":");
+        var coInp=document.querySelector(".tcbulk-co[data-sid='"+sid+"'][data-date='"+date+"']");
+        var co=coInp?coInp.value.trim().replace("：",":"):"";
+        var brkInp=document.querySelector(".tcbulk-brk[data-sid='"+sid+"'][data-date='"+date+"']");
+        var brk=brkInp?parseInt(brkInp.value||0):0;
+        if(!ci){skipped++;return;}
+        if(!/^\d{1,2}:\d{2}$/.test(ci)){skipped++;return;}
+        var ciISO=date+"T"+ci.padStart(5,"0")+":00.000Z";
+        var coISO=co&&/^\d{1,2}:\d{2}$/.test(co)?date+"T"+co.padStart(5,"0")+":00.000Z":null;
+        if(rid){
+          // 既存レコードを更新
+          var rec=db.records.find(function(r){return r.id===rid;});
+          if(rec){
+            rec.ts[0].time=ciISO;
+            if(coISO){
+              var coT=rec.ts.find(function(t){return t.type==="checkout";});
+              if(coT)coT.time=coISO; else rec.ts.push({type:"checkout",time:coISO});
+              rec.co=coISO;rec.done=true;
+            }
+            rec.brk=brk;
+            save();cloudAction("updateRecord",rec);saved++;
+          }
+        }else{
+          // 新規レコード
+          var newRec={id:uid(),sid:sid,rid:null,ts:[{type:"checkin",time:ciISO}],done:false,co:null,brk:brk,created:ciISO,comment:"",isRetro:true};
+          if(coISO){newRec.ts.push({type:"checkout",time:coISO});newRec.co=coISO;newRec.done=true;}
+          db.records.push(newRec);
+          save();cloudAction("addRecord",newRec);saved++;
+        }
+      });
+      render();toast("保存しました（"+saved+"件）");
+    };
+  }
   var balviewDeptSel=document.getElementById("balviewDeptSel");
   if(balviewDeptSel)balviewDeptSel.onchange=function(){balviewDept=this.value;render();};
 
