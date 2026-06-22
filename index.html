@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_127.html -->
+<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_128.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -3065,8 +3065,10 @@ function tcBulkHTML(){
 
       // 既存レコード
       const rec=existingRecs.find(r=>r.sid===s.id&&r.ts.find(t=>t.type==='checkin')?.time.startsWith(dateStr));
-      const ciVal=rec?rec.ts.find(t=>t.type==='checkin')?.time.slice(11,16):'';
-      const coVal=rec&&rec.co?rec.co.slice(11,16):'';
+      const ciRaw=rec?rec.ts.find(t=>t.type==='checkin')?.time:null;
+      const coRaw=rec&&rec.co?rec.co:null;
+      const ciVal=ciRaw?new Date(ciRaw).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tokyo"}):'';
+      const coVal=coRaw?new Date(coRaw).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tokyo"}):'';
       const recId=rec?rec.id:'';
 
       return `<td style="padding:2px;border:1px solid ${BD};${bg}">
