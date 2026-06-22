@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_128.html -->
+<!-- saved from url=(0047)file:///C:/Users/ne-65/Downloads/index_129.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -4008,8 +4008,11 @@ function bindMain(){
         var brk=brkInp?parseInt(brkInp.value||0):0;
         if(!ci){skipped++;return;}
         if(!/^\d{1,2}:\d{2}$/.test(ci)){skipped++;return;}
-        var ciISO=date+"T"+ci.padStart(5,"0")+":00.000Z";
-        var coISO=co&&/^\d{1,2}:\d{2}$/.test(co)?date+"T"+co.padStart(5,"0")+":00.000Z":null;
+        // JSTからUTCに変換（-9時間）
+        function toUTC(d,t){var dt=new Date(d+"T"+t.padStart(5,"0")+":00+09:00");return dt.toISOString();}
+        var ciISO=toUTC(date,ci);
+        var coISO=co&&/^\d{1,2}:\d{2}$/.test(co)?toUTC(date,co):null;
+        // 退勤がUTCで翌日になる場合も正しく処理される
         if(rid){
           // 既存レコードを更新
           var rec=db.records.find(function(r){return r.id===rid;});
